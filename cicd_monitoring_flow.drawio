@@ -1,0 +1,173 @@
+<mxfile host="app.diagrams.net" agent="Codex" scale="1" border="100">
+  <diagram id="gympt-prod-architecture-flow" name="GymPT Prod Architecture Flow">
+    <mxGraphModel dx="7256" dy="2972" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="2500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#111827;" value="GymPT Production GitOps, Runtime, and Observability Flow" vertex="1">
+          <mxGeometry height="50" width="840" x="380" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="developer" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#EEF2FF;strokeColor=#4F46E5;strokeWidth=2;fontSize=16;fontColor=#111827;align=center;verticalAlign=middle;spacing=12;" value="&lt;b&gt;Developer&lt;/b&gt;" vertex="1">
+          <mxGeometry height="80" width="320" x="450" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="source_repos" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F8FAFC;strokeColor=#334155;strokeWidth=2;fontSize=15;fontColor=#0F172A;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;GitHub Source Repos&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;backend-api&lt;br&gt;agent-service&lt;br&gt;report-service&lt;br&gt;posture-analysis-service&lt;br&gt;frontend&lt;/div&gt;" vertex="1">
+          <mxGeometry height="180" width="320" x="450" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="ci" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ECFDF5;strokeColor=#059669;strokeWidth=2;fontSize=15;fontColor=#064E3B;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;GitHub Actions CI&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;checkout source&lt;br&gt;test / lint&lt;br&gt;Docker build&lt;br&gt;image tag = commit SHA&lt;br&gt;push image&lt;/div&gt;" vertex="1">
+          <mxGeometry height="180" width="320" x="450" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="ecr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=2;fontSize=15;fontColor=#7C2D12;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;Amazon ECR&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;backend-api image&lt;br&gt;agent-service image&lt;br&gt;report-service image&lt;br&gt;posture-analysis-service image&lt;br&gt;frontend image&lt;br&gt;worker images&lt;/div&gt;" vertex="1">
+          <mxGeometry height="200" width="330" x="930" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="gitops_repo" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=2;fontSize=15;fontColor=#1E3A8A;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;GitOps Repo: gympt-gitops&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;charts/*/values-prod.yaml&lt;br&gt;Helm values / charts&lt;br&gt;image.repository&lt;br&gt;image.tag&lt;/div&gt;" vertex="1">
+          <mxGeometry height="160" width="320" x="450" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="gitops_ci" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FDF2F8;strokeColor=#DB2777;strokeWidth=2;fontSize=15;fontColor=#831843;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;GitHub Actions: GitOps CI&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;helm lint&lt;br&gt;kubeconform&lt;br&gt;manifest validation&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="320" x="450" y="1040" as="geometry" />
+        </mxCell>
+        <mxCell id="argocd" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FEFCE8;strokeColor=#CA8A04;strokeWidth=2;fontSize=15;fontColor=#713F12;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;Argo CD&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;sync / app-of-apps&lt;br&gt;prod applications&lt;br&gt;platform applications&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="320" x="450" y="1260" as="geometry" />
+        </mxCell>
+        <mxCell id="eks" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F0FDFA;strokeColor=#0D9488;strokeWidth=2;fontSize=15;fontColor=#134E4A;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;Amazon EKS Cluster&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;backend-api pods&lt;br&gt;agent-service pods&lt;br&gt;report-service pods&lt;br&gt;posture-analysis-service pods&lt;br&gt;workers&lt;br&gt;ingress / service&lt;br&gt;external-secrets&lt;br&gt;karpenter / node groups&lt;/div&gt;" vertex="1">
+          <mxGeometry height="240" width="400" x="410" y="1480" as="geometry" />
+        </mxCell>
+        <mxCell id="prometheus" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=2;fontSize=15;fontColor=#7C2D12;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;Prometheus / kube-prometheus-stack&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;ServiceMonitor&lt;br&gt;Pod metrics&lt;br&gt;Node metrics&lt;br&gt;Kubernetes metrics&lt;br&gt;PrometheusRule&lt;/div&gt;" vertex="1">
+          <mxGeometry height="180" width="340" x="170" y="1810" as="geometry" />
+        </mxCell>
+        <mxCell id="grafana" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FDF2F8;strokeColor=#DB2777;strokeWidth=2;fontSize=15;fontColor=#831843;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;Grafana Dashboards&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;app dashboards&lt;br&gt;infra dashboards&lt;br&gt;CloudWatch datasource&lt;/div&gt;" vertex="1">
+          <mxGeometry height="150" width="340" x="670" y="1825" as="geometry" />
+        </mxCell>
+        <mxCell id="alertmanager" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FEF2F2;strokeColor=#DC2626;strokeWidth=2;fontSize=16;fontColor=#7F1D1D;align=center;verticalAlign=middle;spacing=12;" value="&lt;b&gt;Alertmanager&lt;/b&gt;" vertex="1">
+          <mxGeometry height="90" width="340" x="170" y="2080" as="geometry" />
+        </mxCell>
+        <mxCell id="notify" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F8FAFC;strokeColor=#64748B;strokeWidth=2;fontSize=15;fontColor=#0F172A;align=center;verticalAlign=middle;spacing=12;" value="&lt;b&gt;Slack / Email / Operator&lt;/b&gt;" vertex="1">
+          <mxGeometry height="90" width="300" x="20" y="2260" as="geometry" />
+        </mxCell>
+        <mxCell id="remediation" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F0F9FF;strokeColor=#0284C7;strokeWidth=2;fontSize=15;fontColor=#0C4A6E;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;Remediation Worker&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;restart deployment&lt;br&gt;scale deployment&lt;br&gt;rollback Argo CD&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="330" x="380" y="2250" as="geometry" />
+        </mxCell>
+        <mxCell id="aws_resources" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFBEB;strokeColor=#D97706;strokeWidth=2;fontSize=15;fontColor=#78350F;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;AWS Resources&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;RDS&lt;br&gt;ElastiCache&lt;br&gt;S3&lt;br&gt;CloudFront&lt;br&gt;ALB&lt;br&gt;EKS Node Groups&lt;/div&gt;" vertex="1">
+          <mxGeometry height="200" width="330" x="1200" y="1500" as="geometry" />
+        </mxCell>
+        <mxCell id="cloudwatch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=2;fontSize=15;fontColor=#4C1D95;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;CloudWatch Logs / Metrics&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;logs&lt;br&gt;metrics&lt;br&gt;alarms&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="330" x="1200" y="1825" as="geometry" />
+        </mxCell>
+        <mxCell id="grafana_cloudwatch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=2;fontSize=15;fontColor=#4C1D95;align=center;verticalAlign=middle;spacing=12;" value="&lt;b&gt;Grafana CloudWatch Datasource&lt;/b&gt;" vertex="1">
+          <mxGeometry height="90" width="330" x="1200" y="2080" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_log_bucket" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ECFDF5;strokeColor=#059669;strokeWidth=2;fontSize=15;fontColor=#064E3B;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;S3 Log Bucket&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;exported CloudWatch logs&lt;br&gt;application logs&lt;br&gt;ALB access logs&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="330" x="1200" y="2235" as="geometry" />
+        </mxCell>
+        <mxCell id="glue_catalog" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=2;fontSize=15;fontColor=#1E3A8A;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;AWS Glue Data Catalog&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;tables&lt;br&gt;partitions&lt;br&gt;schemas&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="330" x="1200" y="2470" as="geometry" />
+        </mxCell>
+        <mxCell id="athena" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FEFCE8;strokeColor=#CA8A04;strokeWidth=2;fontSize=15;fontColor=#713F12;align=center;verticalAlign=top;spacing=14;" value="&lt;b&gt;Amazon Athena&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;div align=&quot;left&quot;&gt;SQL log analysis&lt;br&gt;incident queries&lt;br&gt;ad hoc reports&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="330" x="1750" y="2460" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_athena_results" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ECFDF5;strokeColor=#059669;strokeWidth=2;fontSize=15;fontColor=#064E3B;align=center;verticalAlign=middle;spacing=12;" value="&lt;b&gt;S3 Athena Query Results&lt;/b&gt;" vertex="1">
+          <mxGeometry height="90" width="330" x="1750" y="2760" as="geometry" />
+        </mxCell>
+        <mxCell id="grafana_athena" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=2;fontSize=15;fontColor=#4C1D95;align=center;verticalAlign=middle;spacing=12;" value="&lt;b&gt;Grafana Athena Datasource&lt;/b&gt;" vertex="1">
+          <mxGeometry height="90" width="330" x="1200" y="2760" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_1" edge="1" parent="1" source="developer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;" target="source_repos" value="1. commit / push">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_2" edge="1" parent="1" source="source_repos" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;" target="ci" value="2. trigger CI">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_3" edge="1" parent="1" source="ci" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;" target="ecr" value="build / test / image">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_4" edge="1" parent="1" source="ci" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;" target="gitops_repo" value="3. update image tag">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_5" edge="1" parent="1" source="gitops_repo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;" target="gitops_ci" value="4. validate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_6" edge="1" parent="1" source="gitops_ci" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;" target="argocd" value="5. watched by">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_7" edge="1" parent="1" source="argocd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;" target="eks" value="6. apply manifests">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_8" edge="1" parent="1" source="ecr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#EA580C;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#7C2D12;labelBackgroundColor=#FFFFFF;" target="eks" value="pull image">
+          <mxGeometry relative="1" x="-0.3455" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1110" y="1510" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge_9" edge="1" parent="1" source="eks" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;exitX=-0.001;exitY=0.446;exitDx=0;exitDy=0;exitPerimeter=0;" target="prometheus" value="metrics / logs">
+          <mxGeometry relative="1" x="0.2481" as="geometry">
+            <mxPoint y="-1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge_10" edge="1" parent="1" source="prometheus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#374151;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#111827;labelBackgroundColor=#FFFFFF;" target="grafana" value="dashboards">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_11" edge="1" parent="1" source="prometheus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DC2626;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#7F1D1D;labelBackgroundColor=#FFFFFF;" target="alertmanager" value="PrometheusRule">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_12" edge="1" parent="1" source="alertmanager" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DC2626;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#7F1D1D;labelBackgroundColor=#FFFFFF;" target="notify" value="notify">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_13" edge="1" parent="1" source="alertmanager" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#0C4A6E;labelBackgroundColor=#FFFFFF;" target="remediation" value="auto remediation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_14" edge="1" parent="1" source="remediation" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#0C4A6E;labelBackgroundColor=#FFFFFF;exitX=0.455;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="argocd" value="rollback / scale / restart">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="530" y="2400" />
+              <mxPoint x="-100" y="2400" />
+              <mxPoint x="-100" y="1330" />
+            </Array>
+            <mxPoint x="-110" y="2325.0000000000005" as="sourcePoint" />
+            <mxPoint x="-140" y="1320" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge_15" edge="1" parent="1" source="eks" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D97706;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#78350F;labelBackgroundColor=#FFFFFF;" target="aws_resources" value="AWS metrics">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_16" edge="1" parent="1" source="aws_resources" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#4C1D95;labelBackgroundColor=#FFFFFF;" target="cloudwatch" value="logs / metrics">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_17" edge="1" parent="1" source="cloudwatch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#4C1D95;labelBackgroundColor=#FFFFFF;" target="grafana_cloudwatch" value="query">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_18" edge="1" parent="1" source="grafana_cloudwatch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#4C1D95;labelBackgroundColor=#FFFFFF;" target="grafana" value="CloudWatch datasource">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_19" edge="1" parent="1" source="cloudwatch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#059669;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#064E3B;labelBackgroundColor=#FFFFFF;" target="s3_log_bucket" value="export logs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1640" y="1895" />
+              <mxPoint x="1640" y="2310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge_20" edge="1" parent="1" source="s3_log_bucket" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#1E3A8A;labelBackgroundColor=#FFFFFF;" target="glue_catalog" value="crawl / catalog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_21" edge="1" parent="1" source="glue_catalog" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#CA8A04;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#713F12;labelBackgroundColor=#FFFFFF;" target="athena" value="query cataloged logs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1650" y="2560" />
+              <mxPoint x="1650" y="2560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge_22" edge="1" parent="1" source="athena" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#059669;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#064E3B;labelBackgroundColor=#FFFFFF;" target="s3_athena_results" value="query results">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_23" edge="1" parent="1" source="s3_athena_results" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#4C1D95;labelBackgroundColor=#FFFFFF;" target="grafana_athena" value="Athena datasource">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_24" edge="1" parent="1" source="grafana_athena" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;endFill=1;fontSize=13;fontColor=#4C1D95;labelBackgroundColor=#FFFFFF;" target="grafana" value="log dashboards">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
