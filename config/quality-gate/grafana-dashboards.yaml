@@ -1,34 +1,65 @@
-baseUrl: https://grafana.example.com
+baseUrl: https://grafana.g2mpt.com
 
 dashboards:
-  backend-api:
-    uid: backend-api-overview
-    title: Backend API Overview
+  api-latency:
+    uid: api-latency
+    title: API Latency Dashboard
     variables:
       service: backend-api
-      namespace: prod
+      namespace: gympt-prod
     panels:
       errorRate: 12
       latency: 18
       podRestart: 24
 
+  jvm-metrics:
+    uid: jvm-metrics
+    title: JVM Metrics Dashboard
+    variables:
+      service: backend-api
+      namespace: gympt-prod
+    panels:
+      heapMemory: 12
+      gc: 18
+      threads: 24
+
+  eks-overview:
+    uid: eks-overview
+    title: EKS Cluster Overview
+    variables:
+      namespace: gympt-prod
+    panels:
+      cpu: 12
+      memory: 18
+      pods: 24
+
+  athena-security-logs:
+    uid: athena-security-logs
+    title: Athena Security Logs
+    variables:
+      service: backend-api
+      namespace: gympt-prod
+    panels:
+      alb5xx: 12
+      wafBlocked: 18
+
   posture-analysis-service:
-    uid: posture-analysis-service-overview
+    uid: api-latency
     title: Posture Analysis Service Overview
     variables:
       service: posture-analysis-service
-      namespace: prod
+      namespace: gympt-prod
     panels:
       errorRate: 12
       latency: 18
       podRestart: 24
 
   worker-lambda:
-    uid: worker-lambda-overview
+    uid: sqs-metrics
     title: Worker Lambda Overview
     variables:
       service: worker-lambda
-      namespace: prod
+      namespace: gympt-prod
     panels:
       errorRate: 12
       latency: 18

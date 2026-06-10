@@ -34,6 +34,7 @@
 | DOC-27 | Rollback Workflow Design | 승인 기반 rollback workflow 설계 |
 | DOC-28 | Data Schema Reference | 이벤트와 분석 payload schema |
 | DOC-29 | Limitations and Future Work | 한계와 향후 확장 방향 |
+| DOC-30 | GymPT Ops Connection Map | gympt-ops 연결값 조사 결과 |
 
 ## 2. 컴포넌트 식별자
 

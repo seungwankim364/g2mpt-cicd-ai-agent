@@ -199,6 +199,7 @@ scripts/aws/stop-after-work.sh --execute
 | DOC-13 | [Repository Architecture](docs/90-reference/13-repository-architecture.md) | 문서 저장소 폴더 구조와 파일별 역할 |
 | DOC-25 | [Configuration Reference](docs/90-reference/14-configuration-reference.md) | 설정 파일과 필드 기준 |
 | DOC-28 | [Data Schema Reference](docs/90-reference/15-data-schema-reference.md) | 이벤트와 분석 payload schema |
+| DOC-30 | [GymPT Ops Connection Map](docs/90-reference/16-gympt-ops-connection-map.md) | gympt-ops 연결값 조사 결과 |
 
 ## 아키텍처 다이어그램
 

@@ -15,11 +15,15 @@
         "alertName": "BackendHighErrorRate",
         "severity": "critical",
         "summary": "Backend API error rate is above threshold"
+      },
+      {
+        "alertName": "BackendDBPoolExhaustion",
+        "severity": "critical",
+        "summary": "Database connection pool near exhaustion"
       }
     ],
     "grafanaLinks": {
-      "dashboard": "https://grafana.example.com/d/backend-api-overview"
+      "dashboard": "https://grafana.g2mpt.com/d/api-latency?var-service=backend-api&var-namespace=gympt-prod"
     }
   }
 }
-

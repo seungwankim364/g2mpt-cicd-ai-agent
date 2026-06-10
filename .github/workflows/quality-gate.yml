@@ -46,7 +46,7 @@ jobs:
       NAMESPACE: ${{ inputs.namespace }}
       DEPLOYMENT: ${{ inputs.deployment }}
       IMAGE_TAG: ${{ inputs.image_tag }}
-      ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,DBConnectionError,WAFBlockedRequestSpike
+      ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
       PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
       EVENT_BUS_NAME: ${{ secrets.EVENT_BUS_NAME }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -81,8 +81,8 @@ jobs:
       - name: Build Grafana links
         run: |
           scripts/quality-gate/build-grafana-links.py \
-            --base-url "https://grafana.example.com" \
-            --dashboard-uid "${SERVICE_NAME}-overview" \
+            --base-url "https://grafana.g2mpt.com" \
+            --dashboard-uid "api-latency" \
             --service "$SERVICE_NAME" \
             --namespace "$NAMESPACE" \
             --output-file grafana-links.json
@@ -119,4 +119,3 @@ jobs:
       - name: Fail job when Quality Gate failed
         if: steps.evaluate.outcome == 'failure'
         run: exit 1
-

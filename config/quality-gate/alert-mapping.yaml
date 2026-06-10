@@ -20,7 +20,7 @@ alerts:
       - observe
 
   BackendPodRestarting:
-    severity: critical
+    severity: warning
     runbook: pod-restarting.sh
     athenaQueries:
       - application-error-patterns
@@ -28,20 +28,20 @@ alerts:
       - rollback
       - manual_fix
 
-  DBConnectionError:
+  BackendDBPoolExhaustion:
     severity: critical
-    runbook: db-connection-error.sh
+    runbook: backend-db-pool-exhaustion.sh
     athenaQueries:
       - application-error-patterns
     recommendedActions:
       - manual_fix
       - rollback
 
-  WAFBlockedRequestSpike:
+  BackendHighMemoryUsage:
     severity: warning
-    runbook: waf-blocked-request-spike.sh
+    runbook: backend-high-memory-usage.sh
     athenaQueries:
-      - waf-blocked-requests
+      - application-error-patterns
     recommendedActions:
       - manual_fix
       - observe

@@ -23,7 +23,7 @@ jobs:
     env:
       SERVICE: ${{ inputs.service }}
       NAMESPACE: ${{ inputs.namespace }}
-      ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting
+      ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
       PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -52,8 +52,8 @@ jobs:
       - name: Build Grafana links
         run: |
           scripts/quality-gate/build-grafana-links.py \
-            --base-url "https://grafana.example.com" \
-            --dashboard-uid "backend-api-overview" \
+            --base-url "https://grafana.g2mpt.com" \
+            --dashboard-uid "api-latency" \
             --service "$SERVICE" \
             --namespace "$NAMESPACE" \
             --output-file grafana-links.json
@@ -81,4 +81,3 @@ jobs:
       - name: Fail CD when Quality Gate failed
         if: steps.evaluate.outcome == 'failure'
         run: exit 1
-

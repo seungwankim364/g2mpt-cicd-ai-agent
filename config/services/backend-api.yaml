@@ -1,9 +1,13 @@
 service: backend-api
 environment: prod
-namespace: prod
-deployment: backend-api
+namespace: gympt-prod
+deployment: backend-api-prod
 argocdApp: backend-api-prod
 owner: platform-team
+chartPath: charts/backend-api
+valuesFile: values-prod.yaml
+imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api
+ingressHost: api.g2mpt.com
 
 qualityGate:
   enabled: true
@@ -12,10 +16,15 @@ qualityGate:
     - BackendHighErrorRate
     - BackendHighLatency
     - BackendPodRestarting
+    - BackendDBPoolExhaustion
+    - BackendHighMemoryUsage
 
 grafana:
-  dashboardKey: backend-api
+  dashboardKey: api-latency
+  additionalDashboardKeys:
+    - jvm-metrics
+    - eks-overview
+    - athena-security-logs
 
 runbooks:
   default: backend-high-error-rate.sh
-

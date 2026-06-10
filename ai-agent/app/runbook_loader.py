@@ -5,7 +5,8 @@ RUNBOOK_MAPPING = {
     "BackendHighErrorRate": "backend-high-error-rate.sh",
     "BackendHighLatency": "backend-high-latency.sh",
     "BackendPodRestarting": "pod-restarting.sh",
-    "DBConnectionError": "db-connection-error.sh",
+    "BackendDBPoolExhaustion": "backend-db-pool-exhaustion.sh",
+    "BackendHighMemoryUsage": "backend-high-memory-usage.sh",
     "WAFBlockedRequestSpike": "waf-blocked-request-spike.sh",
 }
 
@@ -26,4 +27,3 @@ def load_runbooks(alerts: list[dict]) -> list[dict]:
         if alert_name:
             loaded.append(find_runbook(alert_name))
     return loaded
-

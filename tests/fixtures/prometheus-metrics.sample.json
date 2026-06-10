@@ -1,13 +1,14 @@
 {
   "service": "backend-api",
-  "namespace": "prod",
+  "namespace": "gympt-prod",
   "metrics": {
     "http5xxErrorRate": 8.4,
     "p95LatencySeconds": 2.8,
     "podRestartIncrease": 3,
     "unavailableReplicas": 0,
-    "readinessProbeFailure": 0
+    "readinessProbeFailure": 0,
+    "dbPoolUsageRatio": 0.93,
+    "jvmHeapUsageRatio": 0.72
   },
   "source": "fixture"
 }
-

@@ -23,8 +23,12 @@
       "alertName": "BackendHighErrorRate",
       "severity": "critical",
       "summary": "Backend API error rate is above threshold"
+    },
+    {
+      "alertName": "BackendDBPoolExhaustion",
+      "severity": "critical",
+      "summary": "Database connection pool near exhaustion"
     }
   ],
   "queryResults": []
 }
-

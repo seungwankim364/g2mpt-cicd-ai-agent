@@ -1,0 +1,141 @@
+source:
+  readonlyReferenceRoot: ../gympt-ops
+  appRepository: ../gympt-ops/gympt-app
+  gitopsRepository: ../gympt-ops/gympt-gitops
+  infraRepository: ../gympt-ops/gympt-infra
+
+aws:
+  accountId: "337112169365"
+  region: ap-northeast-2
+
+monitoring:
+  namespace: monitoring
+  argocdApp: kube-prometheus-stack
+  prometheusInternalUrl: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+  grafanaBaseUrl: https://grafana.g2mpt.com
+  slack:
+    secretNamespace: monitoring
+    secretName: alertmanager-slack-webhook
+    secretKey: url
+    channels:
+      default: "#alerts"
+      warning: "#alerts-warning"
+      critical: "#alerts-critical"
+  athena:
+    database: gympt_prod_catalog
+    workgroup: gympt-prod-workgroup
+    outputLocation: s3://gympt-prod-athena-results-337112169365/athena-results/
+  dashboards:
+    apiLatency: api-latency
+    eksOverview: eks-overview
+    gpuMetrics: gpu-metrics
+    jvmMetrics: jvm-metrics
+    redisMetrics: redis-metrics
+    sqsMetrics: sqs-metrics
+    athenaSecurityLogs: athena-security-logs
+
+services:
+  backend-api:
+    priority: 1
+    prod:
+      argocdApp: backend-api-prod
+      namespace: gympt-prod
+      chartPath: charts/backend-api
+      valuesFile: values-prod.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api
+      deployment: backend-api-prod
+      ingressHost: api.g2mpt.com
+    dev:
+      argocdApp: backend-api-dev
+      namespace: backend-api
+      chartPath: charts/backend-api
+      valuesFile: values-dev.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-dev/backend-api
+      deployment: backend-api-dev
+      ingressHost: api-dev.g2mpt.com
+    qualityGateAlerts:
+      - BackendHighErrorRate
+      - BackendHighLatency
+      - BackendPodRestarting
+      - BackendDBPoolExhaustion
+      - BackendHighMemoryUsage
+
+  posture-analysis-service:
+    priority: 2
+    prod:
+      argocdApp: posture-analysis-service-prod
+      namespace: gympt-prod
+      chartPath: charts/posture-analysis-service
+      valuesFile: values-prod.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/posture-analysis-service
+      deployment: posture-analysis-service-prod
+      ingressHost: posture.g2mpt.com
+    dev:
+      argocdApp: posture-analysis-service-dev
+      namespace: posture-analysis
+      chartPath: charts/posture-analysis-service
+      valuesFile: values-dev.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-dev/posture-analysis-service
+      deployment: posture-analysis-service-dev
+
+  agent-service:
+    priority: 3
+    prod:
+      argocdApp: agent-service-prod
+      namespace: gympt-prod
+      chartPath: charts/agent-service
+      valuesFile: values-prod.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/agent-service
+      deployment: agent-service-prod
+    dev:
+      argocdApp: agent-service-dev
+      namespace: agent-service
+      chartPath: charts/agent-service
+      valuesFile: values-dev.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-dev/agent-service
+      deployment: agent-service-dev
+
+  report-service:
+    priority: 4
+    prod:
+      argocdApp: report-service-prod
+      namespace: gympt-prod
+      chartPath: charts/report-service
+      valuesFile: values-prod.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/report-service
+      deployment: report-service-prod
+    dev:
+      argocdApp: report-service-dev
+      namespace: report-service
+      chartPath: charts/report-service
+      valuesFile: values-dev.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-dev/report-service
+      deployment: report-service-dev
+
+  kvs-consumer-service:
+    priority: 5
+    prod:
+      argocdApp: kvs-consumer-service-prod
+      namespace: gympt-prod
+      chartPath: charts/kvs-consumer-service
+      valuesFile: values-prod.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/kvs-consumer-service
+      deployment: kvs-consumer-service-prod
+
+  remediation-worker:
+    priority: 6
+    prod:
+      argocdApp: remediation-worker-prod
+      namespace: gympt-prod
+      chartPath: charts/remediation-worker
+      valuesFile: values-prod.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/remediation-worker
+      deployment: remediation-worker-prod
+    dev:
+      argocdApp: remediation-worker-dev
+      namespace: workers
+      chartPath: charts/remediation-worker
+      valuesFile: values-dev.yaml
+      imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-dev/remediation-worker
+      deployment: remediation-worker-dev
+

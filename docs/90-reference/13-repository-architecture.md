@@ -55,6 +55,7 @@ cd-quality-gate-architecture/
       13-repository-architecture.md
       14-configuration-reference.md
       15-data-schema-reference.md
+      16-gympt-ops-connection-map.md
 ```
 
 ## 3. 디렉터리 역할
@@ -104,6 +105,7 @@ cd-quality-gate-architecture/
 | `docs/90-reference/13-repository-architecture.md` | DOC-13 | 문서 저장소 폴더 구조와 파일별 책임 |
 | `docs/90-reference/14-configuration-reference.md` | DOC-25 | 설정 파일과 필드 기준 |
 | `docs/90-reference/15-data-schema-reference.md` | DOC-28 | 이벤트와 분석 payload schema |
+| `docs/90-reference/16-gympt-ops-connection-map.md` | DOC-30 | gympt-ops 연결값 조사 결과 |
 
 ## 5. 문서 간 관계
 
@@ -144,6 +146,7 @@ DOC-00 Overview
   -> DOC-26 Operations Runbook
   -> DOC-27 Rollback Workflow Design
   -> DOC-28 Data Schema Reference
+  -> DOC-30 GymPT Ops Connection Map
 ```
 
 발표 준비 흐름은 다음 순서가 적합하다.

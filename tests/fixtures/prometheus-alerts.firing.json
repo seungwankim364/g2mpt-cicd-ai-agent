@@ -6,7 +6,7 @@
         "labels": {
           "alertname": "BackendHighErrorRate",
           "service": "backend-api",
-          "namespace": "prod",
+          "namespace": "gympt-prod",
           "severity": "critical"
         },
         "annotations": {
@@ -20,7 +20,7 @@
         "labels": {
           "alertname": "BackendHighLatency",
           "service": "backend-api",
-          "namespace": "prod",
+          "namespace": "gympt-prod",
           "severity": "warning"
         },
         "annotations": {
@@ -30,7 +30,21 @@
         "activeAt": "2026-06-09T08:19:00Z",
         "value": "1450"
       }
+      ,
+      {
+        "labels": {
+          "alertname": "BackendDBPoolExhaustion",
+          "service": "backend-api",
+          "namespace": "gympt-prod",
+          "severity": "critical"
+        },
+        "annotations": {
+          "summary": "Database connection pool near exhaustion"
+        },
+        "state": "firing",
+        "activeAt": "2026-06-09T08:20:00Z",
+        "value": "0.93"
+      }
     ]
   }
 }
-
