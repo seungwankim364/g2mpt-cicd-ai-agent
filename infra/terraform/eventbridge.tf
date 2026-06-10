@@ -12,4 +12,3 @@ resource "aws_cloudwatch_event_rule" "deployment_failed" {
     "detail-type" = ["DeploymentFailed"]
   })
 }
-

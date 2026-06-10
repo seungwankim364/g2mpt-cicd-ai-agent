@@ -28,13 +28,13 @@ on:
         default: prod
       namespace:
         required: true
-        default: prod
+        default: gympt-prod
       deployment:
         required: true
-        default: backend-api
+        default: backend-api-prod
       image_tag:
         required: true
-        default: backend-api:latest
+        default: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:latest
 
 jobs:
   quality-gate:
@@ -48,9 +48,10 @@ jobs:
       IMAGE_TAG: ${{ inputs.image_tag }}
       ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
       PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
-      EVENT_BUS_NAME: ${{ secrets.EVENT_BUS_NAME }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+      EVENT_BUS_NAME: cd-quality-gate-prod-bus
+      AWS_REGION: ap-northeast-2
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_CHANNEL: "#cicd-deploy-alarm"
       GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:
@@ -95,6 +96,15 @@ jobs:
             --links-file grafana-links.json \
             --output-file slack-first-alert.json
 
+      - name: Send Slack deploy complete alert
+        if: steps.evaluate.outcome == 'success'
+        run: |
+          scripts/quality-gate/send-slack-deploy-success.py \
+            --service "$SERVICE_NAME" \
+            --namespace "$NAMESPACE" \
+            --image-tag "$IMAGE_TAG" \
+            --output-file slack-deploy-success.json
+
       - name: Publish EventBridge DeploymentFailed event
         if: steps.evaluate.outcome == 'failure'
         env:
@@ -113,6 +123,7 @@ jobs:
             quality-gate-result.json
             grafana-links.json
             slack-first-alert.json
+            slack-deploy-success.json
             deployment-failed-event.json
           if-no-files-found: ignore
 

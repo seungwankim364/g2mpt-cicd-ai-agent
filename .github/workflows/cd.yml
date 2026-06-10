@@ -14,7 +14,7 @@ on:
       image_tag:
         description: Image tag to deploy
         required: true
-        default: backend-api:latest
+        default: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:latest
 
 jobs:
   deploy:
@@ -25,10 +25,10 @@ jobs:
       ENVIRONMENT: ${{ inputs.environment }}
       IMAGE_TAG: ${{ inputs.image_tag }}
       GITOPS_REPO: ${{ secrets.GITOPS_REPO }}
-      VALUES_FILE: ${{ secrets.GITOPS_VALUES_FILE }}
-      ARGOCD_APP: ${{ inputs.service }}-${{ inputs.environment }}
-      K8S_DEPLOYMENT: ${{ inputs.service }}
-      K8S_NAMESPACE: ${{ inputs.environment }}
+      VALUES_FILE: charts/backend-api/values-prod.yaml
+      ARGOCD_APP: backend-api-prod
+      K8S_DEPLOYMENT: backend-api-prod
+      K8S_NAMESPACE: gympt-prod
 
     steps:
       - name: Checkout
@@ -49,8 +49,7 @@ jobs:
     with:
       service: ${{ inputs.service }}
       environment: ${{ inputs.environment }}
-      namespace: ${{ inputs.environment }}
-      deployment: ${{ inputs.service }}
+      namespace: gympt-prod
+      deployment: backend-api-prod
       image_tag: ${{ inputs.image_tag }}
     secrets: inherit
-

@@ -41,7 +41,11 @@ def build_message(result: dict, links: dict, github_run_url: str | None) -> dict
             *(link_lines or ["No links provided."]),
         ]
     )
-    return {"text": text}
+    message = {"text": text}
+    slack_channel = os.environ.get("SLACK_CHANNEL")
+    if slack_channel:
+        message["channel"] = slack_channel
+    return message
 
 
 def post_to_slack(webhook_url: str, message: dict) -> None:
@@ -86,4 +90,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

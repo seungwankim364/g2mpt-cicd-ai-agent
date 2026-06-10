@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-EVENT_BUS_NAME="${EVENT_BUS_NAME:-default}"
+EVENT_BUS_NAME="${EVENT_BUS_NAME:-cd-quality-gate-prod-bus}"
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 SERVICE_NAME="${SERVICE_NAME:-backend-api}"
 ENVIRONMENT="${ENVIRONMENT:-prod}"
@@ -53,4 +53,3 @@ aws events put-events \
   --entries "Source=cd.quality-gate,DetailType=DeploymentFailed,EventBusName=${EVENT_BUS_NAME},Detail=$(jq -c '.detail' "$OUTPUT_FILE")"
 
 echo "Published DeploymentFailed event to EventBridge"
-

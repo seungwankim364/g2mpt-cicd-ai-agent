@@ -5,6 +5,8 @@ locals {
     Project     = var.project
     Environment = var.environment
     ManagedBy   = "terraform"
+    Owner       = var.owner
+    CostControl = var.auto_stop ? "auto-stop" : "manual"
+    Repository  = "cd-quality-gate-architecture"
   }
 }
-

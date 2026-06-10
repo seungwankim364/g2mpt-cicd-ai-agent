@@ -2,6 +2,14 @@ output "event_bus_name" {
   value = aws_cloudwatch_event_bus.cd_quality_gate.name
 }
 
+output "slack_channel" {
+  value = "#cicd-deploy-alarm"
+}
+
+output "required_resource_tags" {
+  value = local.tags
+}
+
 output "event_bus_arn" {
   value = aws_cloudwatch_event_bus.cd_quality_gate.arn
 }
@@ -21,4 +29,3 @@ output "athena_database_name" {
 output "athena_workgroup_name" {
   value = aws_athena_workgroup.cd_quality_gate.name
 }
-

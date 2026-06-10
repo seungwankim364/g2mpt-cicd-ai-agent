@@ -3,8 +3,8 @@ qualityGate:
   enabled: true
   failOnWarning: false
 notifications:
-  slackChannel: "#dev-deployments"
+  slackChannel: "#cicd-deploy-alarm"
 aws:
   region: ap-northeast-2
   resultBucket: cd-quality-gate-dev-results
-
+  eventBusName: cd-quality-gate-dev-bus

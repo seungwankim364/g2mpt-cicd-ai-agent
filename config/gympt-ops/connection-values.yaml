@@ -14,6 +14,7 @@ monitoring:
   prometheusInternalUrl: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
   grafanaBaseUrl: https://grafana.g2mpt.com
   slack:
+    cdQualityGateChannel: "#cicd-deploy-alarm"
     secretNamespace: monitoring
     secretName: alertmanager-slack-webhook
     secretKey: url
@@ -21,6 +22,12 @@ monitoring:
       default: "#alerts"
       warning: "#alerts-warning"
       critical: "#alerts-critical"
+  eventBridge:
+    dedicatedBus:
+      dev: cd-quality-gate-dev-bus
+      prod: cd-quality-gate-prod-bus
+    existingGymptBus: gympt-prod-event-bus
+    decision: use dedicated CD Quality Gate bus for this personal project
   athena:
     database: gympt_prod_catalog
     workgroup: gympt-prod-workgroup
@@ -138,4 +145,3 @@ services:
       valuesFile: values-dev.yaml
       imageRepository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-dev/remediation-worker
       deployment: remediation-worker-dev
-

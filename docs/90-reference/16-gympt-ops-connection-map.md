@@ -144,7 +144,15 @@ Backend API에 대해 이미 사용 가능한 alert가 있다.
 ../gympt-ops/gympt-gitops/platform/monitoring/servicemonitor-*.yaml
 ```
 
-주의: prod Application namespace는 대부분 `gympt-prod`인데, 일부 ServiceMonitor 파일은 dev namespace 기준으로 보인다. 실제 prod PrometheusRule은 `namespace="gympt-prod"`를 사용하므로 prod Quality Gate는 `gympt-prod` 기준으로 잡는 것이 안전하다.
+정합성 확인:
+
+```text
+platform/monitoring/servicemonitor-backend-api.yaml 파일은 namespace backend-api 기준이다.
+하지만 charts/backend-api/templates/servicemonitor.yaml은 metadata.namespace: {{ .Release.Namespace }}를 사용한다.
+backend-api-prod Argo CD Application destination namespace는 gympt-prod다.
+backend-api PrometheusRule도 namespace="gympt-prod"를 조회한다.
+따라서 backend-api-prod Quality Gate는 gympt-prod 기준으로 평가한다.
+```
 
 ## 8. Image Tag 업데이트 연결값
 
@@ -246,9 +254,14 @@ qualityGateAlerts:
 ```text
 실제 GitHub Actions workflow가 어느 repository에서 실행될지
 PROMETHEUS_URL을 cluster 내부 URL로 쓸지 외부 접근 URL로 쓸지
-Slack 1차 알림을 기존 Alertmanager 채널과 합칠지 분리할지
-EventBridge bus를 기존 서비스 bus와 공유할지 별도 생성할지
 Lambda/Athena 분석 파이프라인을 prod부터 붙일지 dev부터 붙일지
-prod ServiceMonitor namespace와 PrometheusRule namespace 기준 최종 정합성
 ```
 
+확정한 값:
+
+```text
+Slack 채널은 신규 #cicd-deploy-alarm 사용
+EventBridge는 개인 파트 전용 cd-quality-gate-prod-bus 사용
+Infra는 Terraform으로 관리
+backend-api-prod Quality Gate namespace는 gympt-prod 사용
+```

@@ -59,14 +59,32 @@ GitHub Actions CD
 | Gate 판단 | [scripts/quality-gate/evaluate-quality-gate.py](scripts/quality-gate/evaluate-quality-gate.py) | firing alert 기반 pass/fail 판단 |
 | Grafana 링크 | [scripts/quality-gate/build-grafana-links.py](scripts/quality-gate/build-grafana-links.py) | Slack에 넣을 dashboard 링크 생성 |
 | Slack 1차 알림 | [scripts/quality-gate/send-slack-first-alert.py](scripts/quality-gate/send-slack-first-alert.py) | 실패 알림 payload 생성 또는 전송 |
+| Slack 배포 완료 알림 | [scripts/quality-gate/send-slack-deploy-success.py](scripts/quality-gate/send-slack-deploy-success.py) | Quality Gate 통과 후 배포 완료 payload 생성 또는 전송 |
 | EventBridge 발행 | [scripts/quality-gate/publish-eventbridge-event.sh](scripts/quality-gate/publish-eventbridge-event.sh) | `DeploymentFailed` 이벤트 payload 생성/발행 |
 | Runbook | [scripts/runbooks](scripts/runbooks) | alert별 운영 확인 스크립트 |
 | Lambda Orchestrator | [lambda/analysis-orchestrator](lambda/analysis-orchestrator) | EventBridge 이후 Athena/AI/Slack 분석 오케스트레이션 |
 | AI Agent | [ai-agent](ai-agent) | Athena summary와 alert를 바탕으로 원인 후보와 조치 추천 생성 |
 | Athena | [athena](athena) | query, query template, external table schema |
-| Infra | [infra](infra) | Terraform/SAM 기반 AWS 리소스 scaffold |
+| Infra | [infra](infra) | Terraform 기준 AWS 리소스 scaffold |
 | Schema | [schemas](schemas) | EventBridge, AI, Slack, rollback JSON schema |
 | AWS 비용 절감 | [scripts/aws/stop-after-work.sh](scripts/aws/stop-after-work.sh) | 퇴근 전 dev 리소스 stop/scale down |
+| 로컬 통합 테스트 | [scripts/test-local.sh](scripts/test-local.sh) | fixture 기반 전체 흐름 검증 |
+
+## 현재 결정 사항
+
+| 항목 | 결정 |
+| --- | --- |
+| 1차 적용 대상 | `backend-api-prod` |
+| Namespace | `gympt-prod` |
+| Argo CD App | `backend-api-prod` |
+| Deployment | `backend-api-prod` |
+| EventBridge | 개인 파트 전용 bus 사용: `cd-quality-gate-prod-bus` |
+| Slack Channel | 신규 채널 사용: `#cicd-deploy-alarm` |
+| Infra 관리 | Terraform 기준 |
+| 비용 태그 | `Project=cd-quality-gate`, `Environment=dev/prod`, `CostControl=auto-stop` |
+| 알림 종류 | 배포 완료, CD 실패 1차 알림, AI 분석/rollback/DR/change 승인 알림 |
+
+ServiceMonitor 정합성 확인 결과, 기존 `platform/monitoring/servicemonitor-backend-api.yaml`는 dev namespace인 `backend-api` 기준이지만, Helm chart 내부 ServiceMonitor template은 `.Release.Namespace`를 사용한다. `backend-api-prod` Application의 destination namespace는 `gympt-prod`이므로 Quality Gate는 `gympt-prod` 기준으로 평가한다.
 
 ## 로컬에서 빠르게 확인
 
@@ -101,6 +119,12 @@ scripts/quality-gate/evaluate-quality-gate.py \
 ```
 
 실패 시 exit code는 `1`이다. GitHub Actions에서는 이 값을 이용해 CD job을 실패 처리한다.
+
+한 번에 전체 로컬 검증:
+
+```bash
+scripts/test-local.sh
+```
 
 ## 퇴근 전 AWS 비용 절감
 

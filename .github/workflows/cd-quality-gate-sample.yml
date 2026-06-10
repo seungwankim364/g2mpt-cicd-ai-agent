@@ -10,7 +10,7 @@ on:
       namespace:
         description: Kubernetes namespace
         required: true
-        default: prod
+        default: gympt-prod
       use_fixture:
         description: Use local fixture instead of Prometheus API
         required: true
@@ -26,6 +26,7 @@ jobs:
       ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
       PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_CHANNEL: "#cicd-deploy-alarm"
       GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:
@@ -66,6 +67,15 @@ jobs:
             --links-file grafana-links.json \
             --output-file slack-first-alert.json
 
+      - name: Render or send deploy complete alert
+        if: steps.evaluate.outcome == 'success'
+        run: |
+          scripts/quality-gate/send-slack-deploy-success.py \
+            --service "$SERVICE" \
+            --namespace "$NAMESPACE" \
+            --image-tag "fixture" \
+            --output-file slack-deploy-success.json
+
       - name: Upload quality gate artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -76,6 +86,7 @@ jobs:
             quality-gate-result.json
             grafana-links.json
             slack-first-alert.json
+            slack-deploy-success.json
           if-no-files-found: ignore
 
       - name: Fail CD when Quality Gate failed

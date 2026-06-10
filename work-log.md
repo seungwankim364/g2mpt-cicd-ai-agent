@@ -650,7 +650,136 @@ docs/10-architecture/06-components.md
 2. ServiceMonitor namespace와 prod namespace 정합성 추가 확인
 3. EventBridge bus를 기존 gympt EventBridge와 공유할지 별도 생성할지 결정
 4. Slack 1차 알림 채널을 기존 Alertmanager 채널과 분리할지 결정
-5. Terraform/SAM 중 실제 배포 방식을 하나로 선택
+5. Terraform 기준 실제 배포 변수와 backend 연결값 확정
 6. README에 work-log.md 링크 추가
 ```
 
+### 2026-06-10 16:20 - work-log.md 생성
+
+작업:
+
+```text
+작업 이력 추적을 위해 루트 work-log.md를 만들었다.
+과거 작업은 파일 timestamp와 대화 흐름 기준으로 복원 기록했다.
+README.md에 work-log.md 링크를 추가했다.
+```
+
+추가 파일:
+
+```text
+work-log.md
+```
+
+수정 파일:
+
+```text
+README.md
+```
+
+### 2026-06-10 16:30 - 실제 적용 결정 사항 반영
+
+작업:
+
+```text
+ServiceMonitor/PrometheusRule namespace 정합성을 gympt-ops read-only로 확인했다.
+backend-api-prod Quality Gate는 gympt-prod namespace 기준으로 평가하기로 확정했다.
+EventBridge는 개인 프로젝트 전용 bus를 새로 쓰기로 했다.
+Slack은 신규 #cicd-deploy-alarm 채널을 사용하기로 했다.
+Infra는 Terraform으로 관리하기로 했다.
+AWS 리소스에는 비용 추적/stop 기준 tag를 넣도록 Terraform을 보강했다.
+로컬 전체 검증 스크립트 scripts/test-local.sh를 추가했다.
+```
+
+gympt-ops read-only 확인:
+
+```text
+../gympt-ops/gympt-gitops/platform/monitoring/servicemonitor-backend-api.yaml
+../gympt-ops/gympt-gitops/charts/backend-api/templates/servicemonitor.yaml
+../gympt-ops/gympt-gitops/argocd/applications/prod/backend-api.yaml
+../gympt-ops/gympt-gitops/platform/monitoring/rules/prometheusrule-backend.yaml
+```
+
+결론:
+
+```text
+static ServiceMonitor 파일은 backend-api namespace 기준이다.
+하지만 chart template은 .Release.Namespace를 사용한다.
+backend-api-prod destination namespace는 gympt-prod다.
+PrometheusRule도 namespace="gympt-prod"를 조회한다.
+따라서 Quality Gate는 gympt-prod 기준으로 설정한다.
+```
+
+추가 파일:
+
+```text
+scripts/quality-gate/send-slack-deploy-success.py
+scripts/test-local.sh
+```
+
+수정 파일:
+
+```text
+.github/workflows/cd.yml
+.github/workflows/quality-gate.yml
+.github/workflows/cd-quality-gate-sample.yml
+config/environments/dev.yaml
+config/environments/prod.yaml
+config/gympt-ops/connection-values.yaml
+scripts/quality-gate/send-slack-first-alert.py
+scripts/quality-gate/publish-eventbridge-event.sh
+infra/terraform/providers.tf
+infra/terraform/variables.tf
+infra/terraform/main.tf
+infra/terraform/s3.tf
+infra/terraform/lambda.tf
+infra/terraform/outputs.tf
+docs/90-reference/16-gympt-ops-connection-map.md
+README.md
+.gitignore
+```
+
+확정값:
+
+```text
+EventBridge bus: cd-quality-gate-prod-bus
+Slack channel: #cicd-deploy-alarm
+Infra: Terraform
+AWS tag: Project=cd-quality-gate, Environment=dev/prod, CostControl=auto-stop
+```
+
+검증:
+
+```text
+scripts/test-local.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+```
+
+### 2026-06-10 17:14 - 로컬 테스트 재실행
+
+사용자 요청으로 지금까지 만든 산출물을 다시 테스트했다.
+
+실행한 검증:
+
+```text
+scripts/test-local.sh
+terraform -chdir=infra/terraform fmt -check
+GitHub Actions 및 config YAML 파싱 확인
+tests/fixtures, schemas, athena/templates, lambda/analysis-orchestrator/events JSON 파싱 확인
+python3 -m pytest lambda/analysis-orchestrator/tests -q
+```
+
+결과:
+
+```text
+scripts/test-local.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+YAML 파싱 통과
+JSON 파싱 통과
+pytest는 현재 로컬 환경에 pytest 모듈이 없어 실행 불가
+```
+
+비고:
+
+```text
+Lambda/AI Agent 로컬 실행 경로는 scripts/test-local.sh 7단계에서 정상 동작 확인
+```
