@@ -783,3 +783,36 @@ pytest는 현재 로컬 환경에 pytest 모듈이 없어 실행 불가
 ```text
 Lambda/AI Agent 로컬 실행 경로는 scripts/test-local.sh 7단계에서 정상 동작 확인
 ```
+
+### 2026-06-10 17:25 - 파일별 역할과 아키텍처 실행 흐름 문서 추가
+
+작업:
+
+```text
+cd-quality-gate-ai-incident-analysis.drawio를 완성할 때 참고할 실행 흐름 문서를 추가했다.
+yml, sh, py, tf, config yaml 파일이 각각 어떤 역할을 하는지 정리했다.
+정상 배포, 실패 감지, EventBridge, Lambda, Athena, AI Agent, Slack 2차 알림까지 파일 실행 순서로 연결했다.
+```
+
+추가 파일:
+
+```text
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+```
+
+수정 파일:
+
+```text
+docs/20-implementation/README.md
+docs/README.md
+README.md
+work-log.md
+```
+
+검증:
+
+```text
+Runtime File Role 문서 참조 확인
+scripts/test-local.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+```

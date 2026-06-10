@@ -70,6 +70,8 @@ GitHub Actions CD
 | AWS 비용 절감 | [scripts/aws/stop-after-work.sh](scripts/aws/stop-after-work.sh) | 퇴근 전 dev 리소스 stop/scale down |
 | 로컬 통합 테스트 | [scripts/test-local.sh](scripts/test-local.sh) | fixture 기반 전체 흐름 검증 |
 
+파일별 역할과 실제 실행 흐름은 [Runtime File Role and Architecture Flow](docs/20-implementation/26-runtime-file-role-and-architecture-flow.md)를 기준으로 본다. 이 문서는 `cd-quality-gate-ai-incident-analysis.drawio`의 각 박스가 어떤 `yml`, `sh`, `py`, Terraform 파일로 실행되는지 연결한다.
+
 ## 현재 결정 사항
 
 | 항목 | 결정 |
