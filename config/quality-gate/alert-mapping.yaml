@@ -28,3 +28,20 @@ alerts:
       - rollback
       - manual_fix
 
+  DBConnectionError:
+    severity: critical
+    runbook: db-connection-error.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - manual_fix
+      - rollback
+
+  WAFBlockedRequestSpike:
+    severity: warning
+    runbook: waf-blocked-request-spike.sh
+    athenaQueries:
+      - waf-blocked-requests
+    recommendedActions:
+      - manual_fix
+      - observe

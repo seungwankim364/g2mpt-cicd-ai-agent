@@ -1,0 +1,122 @@
+name: Quality Gate
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      namespace:
+        required: true
+        type: string
+      deployment:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      service:
+        required: true
+        default: backend-api
+      environment:
+        required: true
+        default: prod
+      namespace:
+        required: true
+        default: prod
+      deployment:
+        required: true
+        default: backend-api
+      image_tag:
+        required: true
+        default: backend-api:latest
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+
+    env:
+      SERVICE_NAME: ${{ inputs.service }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      NAMESPACE: ${{ inputs.namespace }}
+      DEPLOYMENT: ${{ inputs.deployment }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,DBConnectionError,WAFBlockedRequestSpike
+      PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+      EVENT_BUS_NAME: ${{ secrets.EVENT_BUS_NAME }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Query Prometheus alerts
+        env:
+          OUTPUT_FILE: prometheus-alerts.json
+        run: scripts/quality-gate/query-prometheus-alerts.sh
+
+      - name: Query Prometheus metrics
+        env:
+          OUTPUT_FILE: prometheus-metrics.json
+        run: scripts/quality-gate/query-prometheus-metrics.sh
+
+      - name: Evaluate Quality Gate
+        id: evaluate
+        continue-on-error: true
+        run: |
+          scripts/quality-gate/evaluate-quality-gate.py \
+            --alerts-file prometheus-alerts.json \
+            --service "$SERVICE_NAME" \
+            --namespace "$NAMESPACE" \
+            --alert-names "$ALERT_NAMES" \
+            --output-file quality-gate-result.json
+
+      - name: Build Grafana links
+        run: |
+          scripts/quality-gate/build-grafana-links.py \
+            --base-url "https://grafana.example.com" \
+            --dashboard-uid "${SERVICE_NAME}-overview" \
+            --service "$SERVICE_NAME" \
+            --namespace "$NAMESPACE" \
+            --output-file grafana-links.json
+
+      - name: Send Slack first alert
+        if: steps.evaluate.outcome == 'failure'
+        run: |
+          scripts/quality-gate/send-slack-first-alert.py \
+            --result-file quality-gate-result.json \
+            --links-file grafana-links.json \
+            --output-file slack-first-alert.json
+
+      - name: Publish EventBridge DeploymentFailed event
+        if: steps.evaluate.outcome == 'failure'
+        env:
+          QUALITY_GATE_RESULT_FILE: quality-gate-result.json
+          GRAFANA_LINKS_FILE: grafana-links.json
+        run: scripts/quality-gate/publish-eventbridge-event.sh
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate
+          path: |
+            prometheus-alerts.json
+            prometheus-metrics.json
+            quality-gate-result.json
+            grafana-links.json
+            slack-first-alert.json
+            deployment-failed-event.json
+          if-no-files-found: ignore
+
+      - name: Fail job when Quality Gate failed
+        if: steps.evaluate.outcome == 'failure'
+        run: exit 1
+

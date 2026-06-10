@@ -45,17 +45,27 @@ GitHub Actions CD
 
 ## 현재 구현 상태
 
-현재는 MVP 1차 뼈대가 들어 있다.
+`docs/10-architecture`와 `docs/20-implementation/14-implementation-file-architecture.md` 기준으로 실제 구현 scaffold를 채워둔 상태다. 외부 AWS, Slack, Prometheus는 실제 값을 넣기 전에도 fixture와 dry-run으로 흐름을 확인할 수 있다.
 
 | 구분 | 위치 | 설명 |
 | --- | --- | --- |
-| 샘플 workflow | [.github/workflows/cd-quality-gate-sample.yml](.github/workflows/cd-quality-gate-sample.yml) | GitHub Actions에서 Quality Gate를 호출하는 예시 |
+| CD workflow | [.github/workflows/cd.yml](.github/workflows/cd.yml) | GitOps update, Argo CD wait, rollout 확인 후 Quality Gate 호출 |
+| Quality Gate workflow | [.github/workflows/quality-gate.yml](.github/workflows/quality-gate.yml) | Prometheus 조회, Gate 판단, Slack/EventBridge 연동 |
+| 샘플 workflow | [.github/workflows/cd-quality-gate-sample.yml](.github/workflows/cd-quality-gate-sample.yml) | fixture 기반 Quality Gate 실행 예시 |
+| CD 스크립트 | [scripts/cd](scripts/cd) | GitOps image tag 수정, Argo CD 대기, rollout 확인 |
 | 서비스 설정 | [config/services/backend-api.yaml](config/services/backend-api.yaml) | backend-api 기준 서비스 설정 |
 | Quality Gate 설정 | [config/quality-gate](config/quality-gate) | threshold, alert mapping, Grafana dashboard 설정 |
 | Prometheus 조회 | [scripts/quality-gate/query-prometheus-alerts.sh](scripts/quality-gate/query-prometheus-alerts.sh) | Prometheus alert 조회 또는 fixture 사용 |
 | Gate 판단 | [scripts/quality-gate/evaluate-quality-gate.py](scripts/quality-gate/evaluate-quality-gate.py) | firing alert 기반 pass/fail 판단 |
 | Grafana 링크 | [scripts/quality-gate/build-grafana-links.py](scripts/quality-gate/build-grafana-links.py) | Slack에 넣을 dashboard 링크 생성 |
 | Slack 1차 알림 | [scripts/quality-gate/send-slack-first-alert.py](scripts/quality-gate/send-slack-first-alert.py) | 실패 알림 payload 생성 또는 전송 |
+| EventBridge 발행 | [scripts/quality-gate/publish-eventbridge-event.sh](scripts/quality-gate/publish-eventbridge-event.sh) | `DeploymentFailed` 이벤트 payload 생성/발행 |
+| Runbook | [scripts/runbooks](scripts/runbooks) | alert별 운영 확인 스크립트 |
+| Lambda Orchestrator | [lambda/analysis-orchestrator](lambda/analysis-orchestrator) | EventBridge 이후 Athena/AI/Slack 분석 오케스트레이션 |
+| AI Agent | [ai-agent](ai-agent) | Athena summary와 alert를 바탕으로 원인 후보와 조치 추천 생성 |
+| Athena | [athena](athena) | query, query template, external table schema |
+| Infra | [infra](infra) | Terraform/SAM 기반 AWS 리소스 scaffold |
+| Schema | [schemas](schemas) | EventBridge, AI, Slack, rollback JSON schema |
 | AWS 비용 절감 | [scripts/aws/stop-after-work.sh](scripts/aws/stop-after-work.sh) | 퇴근 전 dev 리소스 stop/scale down |
 
 ## 로컬에서 빠르게 확인

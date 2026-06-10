@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RollbackRequest",
+  "type": "object",
+  "required": ["deploymentId", "service", "environment", "currentImageTag", "rollbackImageTag", "approvedBy", "approvedAt"],
+  "properties": {
+    "deploymentId": { "type": "string" },
+    "service": { "type": "string" },
+    "environment": { "type": "string" },
+    "currentImageTag": { "type": "string" },
+    "rollbackImageTag": { "type": "string" },
+    "approvedBy": { "type": "string" },
+    "approvedAt": { "type": "string" },
+    "reason": { "type": "string" }
+  }
+}
+

@@ -1,0 +1,10 @@
+environment: dev
+qualityGate:
+  enabled: true
+  failOnWarning: false
+notifications:
+  slackChannel: "#dev-deployments"
+aws:
+  region: ap-northeast-2
+  resultBucket: cd-quality-gate-dev-results
+

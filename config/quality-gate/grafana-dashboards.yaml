@@ -12,3 +12,24 @@ dashboards:
       latency: 18
       podRestart: 24
 
+  posture-analysis-service:
+    uid: posture-analysis-service-overview
+    title: Posture Analysis Service Overview
+    variables:
+      service: posture-analysis-service
+      namespace: prod
+    panels:
+      errorRate: 12
+      latency: 18
+      podRestart: 24
+
+  worker-lambda:
+    uid: worker-lambda-overview
+    title: Worker Lambda Overview
+    variables:
+      service: worker-lambda
+      namespace: prod
+    panels:
+      errorRate: 12
+      latency: 18
+      podRestart: 24

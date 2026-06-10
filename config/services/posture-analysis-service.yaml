@@ -1,0 +1,21 @@
+service: posture-analysis-service
+environment: prod
+namespace: prod
+deployment: posture-analysis-service
+argocdApp: posture-analysis-service-prod
+owner: security-team
+
+qualityGate:
+  enabled: true
+  waitAfterDeploySeconds: 180
+  alertNames:
+    - BackendHighErrorRate
+    - BackendHighLatency
+    - BackendPodRestarting
+
+grafana:
+  dashboardKey: posture-analysis-service
+
+runbooks:
+  default: backend-high-latency.sh
+

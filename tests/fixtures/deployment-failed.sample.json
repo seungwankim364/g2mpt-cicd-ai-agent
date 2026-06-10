@@ -1,0 +1,22 @@
+{
+  "source": "cd.quality-gate",
+  "detail-type": "DeploymentFailed",
+  "detail": {
+    "deploymentId": "deploy-20260609-001",
+    "service": "backend-api",
+    "environment": "prod",
+    "repository": "org/backend-api",
+    "commitSha": "abc1234",
+    "imageTag": "backend-api:abc1234",
+    "argocdApp": "backend-api-prod",
+    "failedAt": "2026-06-09T08:20:00Z",
+    "alerts": [
+      {
+        "alertName": "BackendHighErrorRate",
+        "severity": "critical",
+        "summary": "Backend API error rate is above threshold"
+      }
+    ]
+  }
+}
+

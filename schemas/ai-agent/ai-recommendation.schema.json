@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIRecommendation",
+  "type": "object",
+  "required": ["deploymentId", "summary", "severity", "causeCandidates", "recommendedAction", "nextSteps", "slackMessage"],
+  "properties": {
+    "deploymentId": { "type": "string" },
+    "summary": { "type": "string" },
+    "severity": { "type": "string" },
+    "causeCandidates": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "recommendedAction": {
+      "type": "object",
+      "required": ["type", "reason", "requiresApproval"],
+      "properties": {
+        "type": { "type": "string", "enum": ["rollback", "manual_fix", "dr", "observe"] },
+        "reason": { "type": "string" },
+        "requiresApproval": { "const": true }
+      }
+    },
+    "nextSteps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "slackMessage": { "type": "object" }
+  }
+}
+

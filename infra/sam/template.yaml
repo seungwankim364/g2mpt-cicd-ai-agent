@@ -1,0 +1,14 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: CD Quality Gate SAM entrypoint
+
+Resources:
+  AnalysisOrchestrator:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../lambda/analysis-orchestrator/
+      Handler: app.handler
+      Runtime: python3.12
+      Timeout: 300
+      MemorySize: 512
+

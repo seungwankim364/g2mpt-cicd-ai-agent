@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: CD Quality Gate analysis orchestrator
+
+Resources:
+  AnalysisOrchestrator:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.12
+      Handler: app.handler
+      CodeUri: .
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          RESULT_BUCKET: !Ref ResultBucket
+          ATHENA_DATABASE: cd_quality_gate_logs
+          ATHENA_WORKGROUP: cd-quality-gate
+      Events:
+        DeploymentFailed:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - cd.quality-gate
+              detail-type:
+                - DeploymentFailed
+
+  ResultBucket:
+    Type: AWS::S3::Bucket
+

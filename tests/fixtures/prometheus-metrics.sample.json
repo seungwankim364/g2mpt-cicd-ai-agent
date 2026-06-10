@@ -1,0 +1,13 @@
+{
+  "service": "backend-api",
+  "namespace": "prod",
+  "metrics": {
+    "http5xxErrorRate": 8.4,
+    "p95LatencySeconds": 2.8,
+    "podRestartIncrease": 3,
+    "unavailableReplicas": 0,
+    "readinessProbeFailure": 0
+  },
+  "source": "fixture"
+}
+

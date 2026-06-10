@@ -1,0 +1,20 @@
+service: worker-lambda
+environment: prod
+namespace: prod
+deployment: worker-lambda
+argocdApp: worker-lambda-prod
+owner: platform-team
+
+qualityGate:
+  enabled: true
+  waitAfterDeploySeconds: 120
+  alertNames:
+    - BackendHighErrorRate
+    - DBConnectionError
+
+grafana:
+  dashboardKey: worker-lambda
+
+runbooks:
+  default: db-connection-error.sh
+

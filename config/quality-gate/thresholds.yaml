@@ -18,3 +18,18 @@ services:
       warning: 500
       critical: 1000
 
+  posture-analysis-service:
+    errorRatePercent:
+      warning: 1
+      critical: 3
+    p95LatencyMs:
+      warning: 800
+      critical: 1500
+
+  worker-lambda:
+    errorRatePercent:
+      warning: 2
+      critical: 5
+    p95LatencyMs:
+      warning: 1000
+      critical: 2000

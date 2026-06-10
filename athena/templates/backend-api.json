@@ -1,0 +1,24 @@
+{
+  "service": "backend-api",
+  "environment": "prod",
+  "windowMinutesBefore": 10,
+  "windowMinutesAfter": 5,
+  "queries": [
+    {
+      "id": "alb-5xx-errors",
+      "file": "alb-5xx-errors.sql",
+      "required": true
+    },
+    {
+      "id": "api-latency-top-paths",
+      "file": "api-latency-top-paths.sql",
+      "required": false
+    },
+    {
+      "id": "application-error-patterns",
+      "file": "application-error-patterns.sql",
+      "required": true
+    }
+  ]
+}
+

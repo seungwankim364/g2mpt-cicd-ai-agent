@@ -1,0 +1,14 @@
+{
+  "service": "worker-lambda",
+  "environment": "prod",
+  "windowMinutesBefore": 15,
+  "windowMinutesAfter": 5,
+  "queries": [
+    {
+      "id": "application-error-patterns",
+      "file": "application-error-patterns.sql",
+      "required": true
+    }
+  ]
+}
+

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeploymentFailedEvent",
+  "type": "object",
+  "required": ["source", "detail-type", "detail"],
+  "properties": {
+    "source": {
+      "const": "cd.quality-gate"
+    },
+    "detail-type": {
+      "const": "DeploymentFailed"
+    },
+    "time": {
+      "type": "string"
+    },
+    "detail": {
+      "type": "object",
+      "required": ["deploymentId", "service", "environment", "failedAt", "alerts"],
+      "properties": {
+        "deploymentId": { "type": "string" },
+        "service": { "type": "string" },
+        "environment": { "type": "string", "enum": ["dev", "staging", "prod"] },
+        "repository": { "type": "string" },
+        "commitSha": { "type": "string" },
+        "imageTag": { "type": "string" },
+        "argocdApp": { "type": "string" },
+        "failedAt": { "type": "string" },
+        "alerts": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    }
+  }
+}
+

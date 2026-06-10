@@ -1,0 +1,30 @@
+{
+  "deploymentId": "deploy-20260609-001",
+  "service": "backend-api",
+  "environment": "prod",
+  "failedAt": "2026-06-09T08:20:00Z",
+  "analysisWindow": {
+    "start": "2026-06-09T08:10:00Z",
+    "end": "2026-06-09T08:25:00Z"
+  },
+  "signals": [
+    {
+      "name": "alb_5xx_spike",
+      "severity": "critical",
+      "summary": "ALB target 5xx increased on /api/v1/orders",
+      "evidence": {
+        "count": 320,
+        "topPath": "/api/v1/orders"
+      }
+    }
+  ],
+  "alerts": [
+    {
+      "alertName": "BackendHighErrorRate",
+      "severity": "critical",
+      "summary": "Backend API error rate is above threshold"
+    }
+  ],
+  "queryResults": []
+}
+

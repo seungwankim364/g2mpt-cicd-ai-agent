@@ -1,0 +1,56 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service name
+        required: true
+        default: backend-api
+      environment:
+        description: Deployment environment
+        required: true
+        default: prod
+      image_tag:
+        description: Image tag to deploy
+        required: true
+        default: backend-api:latest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SERVICE_NAME: ${{ inputs.service }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      GITOPS_REPO: ${{ secrets.GITOPS_REPO }}
+      VALUES_FILE: ${{ secrets.GITOPS_VALUES_FILE }}
+      ARGOCD_APP: ${{ inputs.service }}-${{ inputs.environment }}
+      K8S_DEPLOYMENT: ${{ inputs.service }}
+      K8S_NAMESPACE: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update GitOps image tag
+        run: scripts/cd/update-gitops-image-tag.sh
+
+      - name: Wait Argo CD application
+        run: scripts/cd/wait-argocd-app.sh
+
+      - name: Check Kubernetes rollout
+        run: scripts/cd/check-k8s-rollout.sh
+
+  quality-gate:
+    needs: deploy
+    uses: ./.github/workflows/quality-gate.yml
+    with:
+      service: ${{ inputs.service }}
+      environment: ${{ inputs.environment }}
+      namespace: ${{ inputs.environment }}
+      deployment: ${{ inputs.service }}
+      image_tag: ${{ inputs.image_tag }}
+    secrets: inherit
+

@@ -1,0 +1,19 @@
+{
+  "service": "posture-analysis-service",
+  "environment": "prod",
+  "windowMinutesBefore": 10,
+  "windowMinutesAfter": 5,
+  "queries": [
+    {
+      "id": "application-error-patterns",
+      "file": "application-error-patterns.sql",
+      "required": true
+    },
+    {
+      "id": "api-latency-top-paths",
+      "file": "api-latency-top-paths.sql",
+      "required": false
+    }
+  ]
+}
+
