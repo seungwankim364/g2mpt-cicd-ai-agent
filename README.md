@@ -143,6 +143,8 @@ scripts/aws/stop-after-work.sh --execute
 
 전체 문서는 [docs/README.md](docs/README.md)에서 확인한다.
 
+작업 이력과 변경 이유는 [work-log.md](work-log.md)에 기록한다.
+
 ## 문서 목차
 
 ### 00. Overview
