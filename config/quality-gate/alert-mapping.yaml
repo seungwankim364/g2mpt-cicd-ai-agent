@@ -1,0 +1,30 @@
+alerts:
+  BackendHighErrorRate:
+    severity: critical
+    runbook: backend-high-error-rate.sh
+    athenaQueries:
+      - alb-5xx-errors
+      - application-error-patterns
+    recommendedActions:
+      - rollback
+      - manual_fix
+
+  BackendHighLatency:
+    severity: warning
+    runbook: backend-high-latency.sh
+    athenaQueries:
+      - api-latency-top-paths
+      - application-error-patterns
+    recommendedActions:
+      - manual_fix
+      - observe
+
+  BackendPodRestarting:
+    severity: critical
+    runbook: pod-restarting.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - rollback
+      - manual_fix
+

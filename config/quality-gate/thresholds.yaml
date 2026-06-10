@@ -1,0 +1,20 @@
+defaults:
+  errorRatePercent:
+    warning: 2
+    critical: 5
+  p95LatencyMs:
+    warning: 800
+    critical: 1500
+  podRestartIncrease:
+    warning: 1
+    critical: 3
+
+services:
+  backend-api:
+    errorRatePercent:
+      warning: 1
+      critical: 3
+    p95LatencyMs:
+      warning: 500
+      critical: 1000
+

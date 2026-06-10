@@ -1,0 +1,14 @@
+baseUrl: https://grafana.example.com
+
+dashboards:
+  backend-api:
+    uid: backend-api-overview
+    title: Backend API Overview
+    variables:
+      service: backend-api
+      namespace: prod
+    panels:
+      errorRate: 12
+      latency: 18
+      podRestart: 24
+

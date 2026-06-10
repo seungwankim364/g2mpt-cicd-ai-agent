@@ -1,0 +1,21 @@
+service: backend-api
+environment: prod
+namespace: prod
+deployment: backend-api
+argocdApp: backend-api-prod
+owner: platform-team
+
+qualityGate:
+  enabled: true
+  waitAfterDeploySeconds: 120
+  alertNames:
+    - BackendHighErrorRate
+    - BackendHighLatency
+    - BackendPodRestarting
+
+grafana:
+  dashboardKey: backend-api
+
+runbooks:
+  default: backend-high-error-rate.sh
+

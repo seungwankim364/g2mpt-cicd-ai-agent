@@ -1,0 +1,84 @@
+name: CD Quality Gate Sample
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service name
+        required: true
+        default: backend-api
+      namespace:
+        description: Kubernetes namespace
+        required: true
+        default: prod
+      use_fixture:
+        description: Use local fixture instead of Prometheus API
+        required: true
+        default: "true"
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+
+    env:
+      SERVICE: ${{ inputs.service }}
+      NAMESPACE: ${{ inputs.namespace }}
+      ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting
+      PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Query Prometheus alerts
+        env:
+          OUTPUT_FILE: quality-gate-alerts.json
+          FIXTURE_FILE: ${{ inputs.use_fixture == 'true' && 'tests/fixtures/prometheus-alerts.firing.json' || '' }}
+        run: scripts/quality-gate/query-prometheus-alerts.sh
+
+      - name: Evaluate Quality Gate
+        id: evaluate
+        continue-on-error: true
+        run: |
+          scripts/quality-gate/evaluate-quality-gate.py \
+            --alerts-file quality-gate-alerts.json \
+            --service "$SERVICE" \
+            --namespace "$NAMESPACE" \
+            --alert-names "$ALERT_NAMES" \
+            --output-file quality-gate-result.json
+
+      - name: Build Grafana links
+        run: |
+          scripts/quality-gate/build-grafana-links.py \
+            --base-url "https://grafana.example.com" \
+            --dashboard-uid "backend-api-overview" \
+            --service "$SERVICE" \
+            --namespace "$NAMESPACE" \
+            --output-file grafana-links.json
+
+      - name: Render or send Slack alert
+        if: steps.evaluate.outcome == 'failure'
+        run: |
+          scripts/quality-gate/send-slack-first-alert.py \
+            --result-file quality-gate-result.json \
+            --links-file grafana-links.json \
+            --output-file slack-first-alert.json
+
+      - name: Upload quality gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-result
+          path: |
+            quality-gate-alerts.json
+            quality-gate-result.json
+            grafana-links.json
+            slack-first-alert.json
+          if-no-files-found: ignore
+
+      - name: Fail CD when Quality Gate failed
+        if: steps.evaluate.outcome == 'failure'
+        run: exit 1
+

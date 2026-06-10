@@ -1,0 +1,36 @@
+{
+  "status": "success",
+  "data": {
+    "alerts": [
+      {
+        "labels": {
+          "alertname": "BackendHighErrorRate",
+          "service": "backend-api",
+          "namespace": "prod",
+          "severity": "critical"
+        },
+        "annotations": {
+          "summary": "Backend API error rate is above threshold"
+        },
+        "state": "firing",
+        "activeAt": "2026-06-09T08:18:00Z",
+        "value": "8.2"
+      },
+      {
+        "labels": {
+          "alertname": "BackendHighLatency",
+          "service": "backend-api",
+          "namespace": "prod",
+          "severity": "warning"
+        },
+        "annotations": {
+          "summary": "Backend API p95 latency is high"
+        },
+        "state": "firing",
+        "activeAt": "2026-06-09T08:19:00Z",
+        "value": "1450"
+      }
+    ]
+  }
+}
+
