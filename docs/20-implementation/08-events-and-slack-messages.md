@@ -123,11 +123,11 @@ Links:
 
 ## 4. Athena Query 예시
 
-## 4. 승인 이벤트: rollback / DR / manual fix / change
+## 5. 승인 이벤트: rollback / DR / manual fix / change
 
 AI Agent가 추천한 조치를 운영자가 승인하면 승인 이벤트를 EventBridge에 발행한다.
 
-이 이벤트는 승인 audit trail이며, 실제 rollback GitOps 변경이나 DR 전환 실행기는 다음 단계에서 이 이벤트를 소비하도록 연결한다.
+이 이벤트는 승인 audit trail이면서 자동 실행 trigger다. EventBridge rule이 `deployment-action-executor` Lambda를 호출하고, Lambda가 action type에 맞는 GitHub Actions workflow를 dispatch한다.
 
 ```json
 {
@@ -148,21 +148,33 @@ AI Agent가 추천한 조치를 운영자가 승인하면 승인 이벤트를 Ev
 }
 ```
 
-현재 MVP 실행 경로:
+현재 실행 경로:
+
+```text
+Slack 2차 알림 승인 버튼
+  -> API Gateway /slack/interactions
+  -> lambda/slack-approval-handler/app.py
+  -> EventBridge DeploymentActionApproved
+  -> lambda/deployment-action-executor/app.py
+  -> rollback / dr / manual_fix / change workflow dispatch
+  -> 필요 시 gympt-app 배포 workflow dispatch
+```
+
+수동 fallback 경로:
 
 ```text
 GitHub Actions approved-action.yml workflow_dispatch
   -> scripts/quality-gate/publish-approved-action-event.sh
   -> EventBridge cd-quality-gate-prod-bus
-  -> DeploymentActionApproved event 저장/전달
+  -> lambda/deployment-action-executor/app.py
 ```
 
-아직 하지 않는 것:
+주의:
 
 ```text
-승인 즉시 GitOps values 변경
-승인 즉시 Argo CD rollback
-승인 즉시 DR 전환
+rollback 자동 실행에는 targetImageTag가 필요하다.
+DeploymentFailed 이벤트에 rollbackImageTag가 없으면 Slack 승인 payload의 targetImageTag가 비어 rollback workflow가 실패할 수 있다.
+따라서 기존 app 배포 workflow가 이전 정상 image tag를 ROLLBACK_IMAGE_TAG로 넘기거나, 별도 배포 이력 저장소에서 조회해야 한다.
 ```
 
 ```sql

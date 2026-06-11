@@ -6,19 +6,20 @@ AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 SERVICE_NAME="${SERVICE_NAME:-backend-api}"
 ENVIRONMENT="${ENVIRONMENT:-prod}"
 IMAGE_TAG="${IMAGE_TAG:-unknown}"
+ROLLBACK_IMAGE_TAG="${ROLLBACK_IMAGE_TAG:-}"
 COMMIT_SHA="${GITHUB_SHA:-unknown}"
 QUALITY_GATE_RESULT_FILE="${QUALITY_GATE_RESULT_FILE:-quality-gate-result.json}"
 GRAFANA_LINKS_FILE="${GRAFANA_LINKS_FILE:-grafana-links.json}"
 OUTPUT_FILE="${OUTPUT_FILE:-deployment-failed-event.json}"
 DRY_RUN="${DRY_RUN:-false}"
 
-python3 - "$QUALITY_GATE_RESULT_FILE" "$GRAFANA_LINKS_FILE" "$OUTPUT_FILE" "$SERVICE_NAME" "$ENVIRONMENT" "$IMAGE_TAG" "$COMMIT_SHA" <<'PY'
+python3 - "$QUALITY_GATE_RESULT_FILE" "$GRAFANA_LINKS_FILE" "$OUTPUT_FILE" "$SERVICE_NAME" "$ENVIRONMENT" "$IMAGE_TAG" "$ROLLBACK_IMAGE_TAG" "$COMMIT_SHA" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-result_path, links_path, output_path, service, environment, image_tag, commit_sha = sys.argv[1:]
+result_path, links_path, output_path, service, environment, image_tag, rollback_image_tag, commit_sha = sys.argv[1:]
 result = json.loads(Path(result_path).read_text(encoding="utf-8"))
 links = json.loads(Path(links_path).read_text(encoding="utf-8")) if Path(links_path).exists() else {}
 now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -33,10 +34,13 @@ event = {
         "repository": "unknown",
         "commitSha": commit_sha,
         "imageTag": image_tag,
+        "rollbackImageTag": rollback_image_tag,
         "argocdApp": f"{service}-{environment}",
+        "argocdUrl": links.get("argocd"),
         "failedAt": now,
         "alerts": result.get("matchedAlerts", []),
         "grafanaLinks": links.get("grafana", {}),
+        "prometheusLinks": links.get("prometheus", {}),
         "qualityGateResult": result,
     },
 }

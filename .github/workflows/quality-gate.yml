@@ -59,6 +59,8 @@ jobs:
       ARGOCD_URL: https://argocd.g2mpt.com
       ARGOCD_APP: backend-api-prod
       GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      HEALTH_CHECK_WINDOW_SECONDS: 300
+      HEALTH_CHECK_INTERVAL_SECONDS: 60
 
     steps:
       - name: Checkout
@@ -77,26 +79,10 @@ jobs:
           K8S_DEPLOYMENT: ${{ inputs.deployment }}
         run: scripts/cd/check-k8s-rollout.sh
 
-      - name: Query Prometheus alerts
-        env:
-          OUTPUT_FILE: prometheus-alerts.json
-        run: scripts/quality-gate/query-prometheus-alerts.sh
-
-      - name: Query Prometheus metrics
-        env:
-          OUTPUT_FILE: prometheus-metrics.json
-        run: scripts/quality-gate/query-prometheus-metrics.sh
-
-      - name: Evaluate Quality Gate
+      - name: Run 5-minute health check window
         id: evaluate
         continue-on-error: true
-        run: |
-          scripts/quality-gate/evaluate-quality-gate.py \
-            --alerts-file prometheus-alerts.json \
-            --service "$SERVICE_NAME" \
-            --namespace "$NAMESPACE" \
-            --alert-names "$ALERT_NAMES" \
-            --output-file quality-gate-result.json
+        run: scripts/quality-gate/run-health-check-window.sh
 
       - name: Build Grafana links
         run: |
@@ -141,8 +127,12 @@ jobs:
           name: quality-gate
           path: |
             prometheus-alerts.json
+            prometheus-alerts-*.json
             prometheus-metrics.json
+            prometheus-metrics-*.json
             quality-gate-result.json
+            quality-gate-result-*.json
+            quality-gate-window-result.json
             grafana-links.json
             slack-first-alert.json
             slack-deploy-success.json

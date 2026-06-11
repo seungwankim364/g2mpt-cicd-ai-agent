@@ -85,6 +85,7 @@ Repository
 | `ARGOCD_APP` | `backend-api-prod` | `.github/workflows/quality-gate.yml` | 1차 Slack 알림 대상 Application |
 | `GITOPS_REPO` | `hj-3/gympt-gitops` | 기존 gympt-ops app CI/CD | 이 저장소의 필수 runtime 값이 아님 |
 | `GITHUB_TOKEN_SECRET_ARN` | unset | Terraform variable `github_token_secret_arn` | 승인 후 대상 GitHub workflow 자동 dispatch용 token secret |
+| `SLACK_WEBHOOK_SECRET_ARN` | Terraform resource `aws_secretsmanager_secret.slack_webhook_url.arn` | `lambda/analysis-orchestrator/app.py` | Lambda가 Slack 2차 알림 webhook을 Secrets Manager에서 조회 |
 | `ROLLBACK_WORKFLOW_REPO` | unset | Terraform variable `rollback_workflow_repo` | rollback 승인 시 dispatch할 repository |
 | `DR_WORKFLOW_REPO` | unset | Terraform variable `dr_workflow_repo` | DR 승인 시 dispatch할 repository |
 | `APP_DEPLOY_WORKFLOW_REPO` | `hj-3/gympt-app` | Terraform variable `app_deploy_workflow_repo` | 조치 후 처음부터 다시 실행할 app 배포 workflow repository |

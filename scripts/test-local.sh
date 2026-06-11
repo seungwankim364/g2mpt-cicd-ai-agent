@@ -40,6 +40,11 @@ scripts/quality-gate/evaluate-quality-gate.py \
   --alert-names BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage \
   --output-file "$TMP_DIR/quality-gate-result-normal.json"
 
+ALERT_FIXTURE_FILE=tests/fixtures/prometheus-alerts.normal.json \
+OUTPUT_DIR="$TMP_DIR/window-normal" \
+HEALTH_CHECK_WINDOW_SECONDS=0 \
+scripts/quality-gate/run-health-check-window.sh
+
 echo "[5/8] Quality Gate fail fixture"
 FIXTURE_FILE=tests/fixtures/prometheus-alerts.firing.json \
 OUTPUT_FILE="$TMP_DIR/prometheus-alerts-firing.json" \
@@ -52,6 +57,14 @@ if scripts/quality-gate/evaluate-quality-gate.py \
   --alert-names BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage \
   --output-file "$TMP_DIR/quality-gate-result-firing.json"; then
   echo "Expected failing fixture to fail Quality Gate" >&2
+  exit 1
+fi
+
+if ALERT_FIXTURE_FILE=tests/fixtures/prometheus-alerts.firing.json \
+  OUTPUT_DIR="$TMP_DIR/window-firing" \
+  HEALTH_CHECK_WINDOW_SECONDS=0 \
+  scripts/quality-gate/run-health-check-window.sh; then
+  echo "Expected failing fixture to fail Quality Gate health check window" >&2
   exit 1
 fi
 

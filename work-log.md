@@ -1253,6 +1253,83 @@ gympt-app 배포 workflow는 workflow_dispatch 입력을 받아야 한다.
 gympt-app 배포 workflow 마지막에는 cd-quality-gate-architecture의 quality-gate.yml 호출이 있어야 Slack 배포 완료 알림까지 이어진다.
 ```
 
+### 2026-06-11 17:18 - Runtime flow 대조 및 누락 보정
+
+작업:
+
+```text
+Quality Gate 이후 EventBridge, Lambda, AI Agent, Slack 승인, action executor 흐름을 실제 파일 기준으로 대조했다.
+analysis-orchestrator Lambda가 Slack 2차 알림 webhook을 읽지 못하던 문제를 보정했다.
+DeploymentFailed 이벤트와 Athena summary에 rollbackImageTag, Grafana/Prometheus/Argo CD 링크가 이어지도록 보강했다.
+승인 이벤트 문서가 과거 fallback 흐름만 설명하던 부분을 Slack 버튼 -> API Gateway -> EventBridge -> action executor 자동 실행 흐름으로 정정했다.
+```
+
+수정 파일:
+
+```text
+lambda/analysis-orchestrator/app.py
+scripts/quality-gate/publish-eventbridge-event.sh
+infra/terraform/lambda.tf
+infra/terraform/iam.tf
+docs/20-implementation/08-events-and-slack-messages.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+work-log.md
+```
+
+주의:
+
+```text
+자동 rollback은 targetImageTag가 필요하다.
+기존 app 배포 workflow가 이전 정상 image tag를 ROLLBACK_IMAGE_TAG로 넘기거나 별도 배포 이력 저장소에서 조회해야 완전히 자동 실행된다.
+```
+
+검증:
+
+```text
+bash -n scripts/quality-gate/*.sh scripts/cd/*.sh scripts/aws/*.sh scripts/runbooks/*.sh 통과
+terraform -chdir=infra/terraform fmt 적용 및 fmt -check 통과
+GitHub workflow YAML parse 통과
+scripts/test-local.sh 통과
+deployment-failed-event.json에 rollbackImageTag, argocdUrl, grafanaLinks, prometheusLinks 필드 포함 확인
+```
+
+### 2026-06-11 17:10 - Quality Gate 5분 Health Check Window 반영
+
+작업:
+
+```text
+quality-gate.yml이 Prometheus를 단발 조회하던 구조를 5분 Health Check Window 구조로 변경했다.
+run-health-check-window.sh를 추가해 기본 300초 동안 60초 간격으로 Prometheus alert/metric을 조회하고 sample별 결과를 집계한다.
+로컬 테스트에서는 HEALTH_CHECK_WINDOW_SECONDS=0으로 빠르게 window 동작을 검증하도록 추가했다.
+README와 runtime flow 문서에 5분 Health Check Window 기준을 반영했다.
+```
+
+추가 파일:
+
+```text
+scripts/quality-gate/run-health-check-window.sh
+```
+
+수정 파일:
+
+```text
+.github/workflows/quality-gate.yml
+scripts/test-local.sh
+README.md
+docs/20-implementation/14-implementation-file-architecture.md
+docs/20-implementation/15-github-actions-workflow-design.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+work-log.md
+```
+
+검증:
+
+```text
+HEALTH_CHECK_WINDOW_SECONDS=1 HEALTH_CHECK_INTERVAL_SECONDS=1 run-health-check-window.sh 통과
+scripts/test-local.sh 통과
+```
+
 ### 2026-06-11 16:32 - draw.io 기준 누락/불일치 점검
 
 작업:

@@ -34,7 +34,7 @@ Existing gympt-ops CI/CD
   -> Argo CD automated sync
   -> EKS rollout 완료
   -> cd-quality-gate-architecture extension 시작
-  -> Prometheus alert 조회
+  -> 5분 Health Check Window 동안 Prometheus alert/metric 조회
   -> Quality Gate 판단
   -> 정상: CD 성공
   -> 실패: CD 실패 + Slack 1차 알림
@@ -58,6 +58,7 @@ Existing gympt-ops CI/CD
 | CD 보조 스크립트 | [scripts/cd](scripts/cd) | rollout 확인, 선택적 GitOps/Argo CD 수동 운영 보조 도구 |
 | 서비스 설정 | [config/services/backend-api.yaml](config/services/backend-api.yaml) | backend-api 기준 서비스 설정 |
 | Quality Gate 설정 | [config/quality-gate](config/quality-gate) | threshold, alert mapping, Grafana dashboard 설정 |
+| Health Check Window | [scripts/quality-gate/run-health-check-window.sh](scripts/quality-gate/run-health-check-window.sh) | 기본 5분 동안 60초 간격으로 Prometheus alert/metric을 반복 조회하고 최종 Gate 결과 집계 |
 | Prometheus 조회 | [scripts/quality-gate/query-prometheus-alerts.sh](scripts/quality-gate/query-prometheus-alerts.sh) | Prometheus alert 조회 또는 fixture 사용 |
 | Gate 판단 | [scripts/quality-gate/evaluate-quality-gate.py](scripts/quality-gate/evaluate-quality-gate.py) | firing alert 기반 pass/fail 판단 |
 | Grafana 링크 | [scripts/quality-gate/build-grafana-links.py](scripts/quality-gate/build-grafana-links.py) | Slack에 넣을 dashboard 링크 생성 |

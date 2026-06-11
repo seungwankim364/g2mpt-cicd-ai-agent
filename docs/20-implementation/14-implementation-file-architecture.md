@@ -644,9 +644,10 @@ Post Deploy Quality Gate
   -> .github/workflows/cd.yml
   -> .github/workflows/quality-gate.yml
   -> scripts/cd/check-k8s-rollout.sh
-  -> scripts/quality-gate/query-prometheus-alerts.sh
-  -> scripts/quality-gate/query-prometheus-metrics.sh
-  -> scripts/quality-gate/evaluate-quality-gate.py
+  -> scripts/quality-gate/run-health-check-window.sh
+     -> scripts/quality-gate/query-prometheus-alerts.sh
+     -> scripts/quality-gate/query-prometheus-metrics.sh
+     -> scripts/quality-gate/evaluate-quality-gate.py
   -> scripts/quality-gate/build-grafana-links.py
 
 Failure Notification
@@ -678,6 +679,7 @@ cd-quality-gate/
       cd.yml
   scripts/
     quality-gate/
+      run-health-check-window.sh
       query-prometheus-alerts.sh
       evaluate-quality-gate.py
       build-grafana-links.py

@@ -54,6 +54,13 @@ resource "aws_iam_role_policy" "analysis_orchestrator" {
           "glue:GetTable"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.slack_webhook_url.arn
       }
     ]
   })

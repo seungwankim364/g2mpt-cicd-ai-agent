@@ -10,11 +10,12 @@ resource "aws_lambda_function" "analysis_orchestrator" {
 
   environment {
     variables = {
-      RESULT_BUCKET          = aws_s3_bucket.analysis_results.bucket
-      ATHENA_DATABASE        = aws_athena_database.logs.name
-      ATHENA_WORKGROUP       = aws_athena_workgroup.cd_quality_gate.name
-      ATHENA_OUTPUT_LOCATION = "s3://${aws_s3_bucket.analysis_results.bucket}/athena-results/"
-      SLACK_CHANNEL          = "#cd-deploy-alarm"
+      RESULT_BUCKET            = aws_s3_bucket.analysis_results.bucket
+      ATHENA_DATABASE          = aws_athena_database.logs.name
+      ATHENA_WORKGROUP         = aws_athena_workgroup.cd_quality_gate.name
+      ATHENA_OUTPUT_LOCATION   = "s3://${aws_s3_bucket.analysis_results.bucket}/athena-results/"
+      SLACK_CHANNEL            = "#cd-deploy-alarm"
+      SLACK_WEBHOOK_SECRET_ARN = aws_secretsmanager_secret.slack_webhook_url.arn
     }
   }
 

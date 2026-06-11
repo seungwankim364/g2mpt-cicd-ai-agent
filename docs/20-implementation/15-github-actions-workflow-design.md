@@ -124,10 +124,8 @@ jobs:
     steps:
       - name: Checkout
       - name: Check Kubernetes rollout
-      - name: Query Prometheus alerts
-      - name: Query Prometheus metrics
+      - name: Run 5-minute health check window
       - name: Build Grafana links
-      - name: Evaluate quality gate
       - name: Send Slack deploy success
         if: success()
       - name: Send Slack first alert
@@ -140,10 +138,11 @@ jobs:
 
 | Step | Script | Output |
 | --- | --- | --- |
-| Query Prometheus alerts | `scripts/quality-gate/query-prometheus-alerts.sh` | `prometheus-alerts.json` |
-| Query Prometheus metrics | `scripts/quality-gate/query-prometheus-metrics.sh` | `prometheus-metrics.json` |
+| Run health check window | `scripts/quality-gate/run-health-check-window.sh` | `quality-gate-window-result.json`, `quality-gate-result.json` |
+| Query Prometheus alerts | `scripts/quality-gate/query-prometheus-alerts.sh` | `prometheus-alerts-<sample>.json`, `prometheus-alerts.json` |
+| Query Prometheus metrics | `scripts/quality-gate/query-prometheus-metrics.sh` | `prometheus-metrics-<sample>.json`, `prometheus-metrics.json` |
 | Build Grafana links | `scripts/quality-gate/build-grafana-links.py` | `grafana-links.json` |
-| Evaluate gate | `scripts/quality-gate/evaluate-quality-gate.py` | `quality-gate-result.json` |
+| Evaluate gate | `scripts/quality-gate/evaluate-quality-gate.py` | `quality-gate-result-<sample>.json` |
 | Send Slack alert | `scripts/quality-gate/send-slack-first-alert.py` | Slack message |
 | Publish event | `scripts/quality-gate/publish-eventbridge-event.sh` | EventBridge event |
 

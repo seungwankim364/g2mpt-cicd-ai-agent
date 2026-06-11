@@ -21,9 +21,11 @@ Developer 또는 운영자
   -> 여기서부터 cd-quality-gate-architecture 확장 시작
   -> .github/workflows/quality-gate.yml 실행 또는 기존 workflow에서 호출
   -> scripts/cd/check-k8s-rollout.sh
-  -> scripts/quality-gate/query-prometheus-alerts.sh
-  -> scripts/quality-gate/query-prometheus-metrics.sh
-  -> scripts/quality-gate/evaluate-quality-gate.py
+  -> scripts/quality-gate/run-health-check-window.sh
+     -> 5분 동안 Prometheus alert/metric 반복 조회
+     -> scripts/quality-gate/query-prometheus-alerts.sh
+     -> scripts/quality-gate/query-prometheus-metrics.sh
+     -> scripts/quality-gate/evaluate-quality-gate.py
   -> 성공이면 scripts/quality-gate/send-slack-deploy-success.py
   -> 실패이면 scripts/quality-gate/build-grafana-links.py
   -> 실패이면 scripts/quality-gate/send-slack-first-alert.py
@@ -84,17 +86,23 @@ cd-quality-gate-runtime
 
     prometheus
       url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+      health-check-window:
+        script: scripts/quality-gate/run-health-check-window.sh
+        duration: 300s
+        interval: 60s
+        output: quality-gate-window-result.json
       query-alerts:
         script: scripts/quality-gate/query-prometheus-alerts.sh
-        output: prometheus-alerts.json
+        output: prometheus-alerts-<sample>.json
       query-metrics:
         script: scripts/quality-gate/query-prometheus-metrics.sh
-        output: prometheus-metrics.json
+        output: prometheus-metrics-<sample>.json
 
     decision
       script: scripts/quality-gate/evaluate-quality-gate.py
-      input: prometheus-alerts.json
-      output: quality-gate-result.json
+      input: prometheus-alerts-<sample>.json
+      output: quality-gate-result-<sample>.json
+      aggregate-output: quality-gate-result.json
       pass:
         script: scripts/quality-gate/send-slack-deploy-success.py
         output: slack-deploy-success.json
@@ -129,12 +137,13 @@ cd-quality-gate-runtime
 | GitOps image tag update | existing `gympt-ops` app workflow | 이 저장소가 수행하지 않음. 기존 app CI/CD가 GitOps values-dev/prod.yaml을 갱신 |
 | Argo CD automated sync | `argocd/applications/prod/backend-api.yaml` in `gympt-ops` | GitOps 변경을 감지해 `backend-api-prod`를 자동 sync |
 | Kubernetes rollout | `scripts/cd/check-k8s-rollout.sh` | self-hosted runner에서 `K8S_NAMESPACE=gympt-prod`, `K8S_DEPLOYMENT=backend-api-prod` rollout 상태 확인 |
-| Quality Gate | `.github/workflows/quality-gate.yml` | Prometheus 조회, gate 판단, Slack 알림, EventBridge 발행을 순서대로 실행 |
+| Quality Gate | `.github/workflows/quality-gate.yml` | rollout 확인 후 5분 Health Check Window를 실행하고, Slack 알림/EventBridge 발행을 처리 |
+| Health Check Window | `scripts/quality-gate/run-health-check-window.sh` | 기본 300초 동안 60초 간격으로 0초~300초 지점까지 Prometheus alert/metric을 조회하고 sample 결과를 집계 |
 | Prometheus alerts | `scripts/quality-gate/query-prometheus-alerts.sh` | Prometheus API에서 현재 alert 목록을 조회하거나 fixture로 대체 |
 | Prometheus metrics | `scripts/quality-gate/query-prometheus-metrics.sh` | 배포 직후 판단에 필요한 metric snapshot을 조회 |
-| Gate decision | `scripts/quality-gate/evaluate-quality-gate.py` | firing alert 중 서비스/namespace/alert name이 일치하는 항목이 있으면 실패 처리 |
+| Gate decision | `scripts/quality-gate/evaluate-quality-gate.py` | 각 sample에서 firing alert 중 서비스/namespace/alert name이 일치하는 항목이 있으면 실패 처리 |
 | Grafana links | `scripts/quality-gate/build-grafana-links.py` | Slack 메시지에 넣을 Grafana dashboard URL 생성 |
-| Slack 1차 실패 알림 | `scripts/quality-gate/send-slack-first-alert.py` | CD 실패 즉시 `#cd-deploy-alarm`에 alert, Grafana, Prometheus, Argo CD, GitHub Actions 링크 포함 payload 생성/전송 |
+| Slack 1차 실패 알림 | `scripts/quality-gate/send-slack-first-alert.py` | 5분 Health Check Window 실패 확정 후 `#cd-deploy-alarm`에 alert, Grafana, Prometheus, Argo CD, GitHub Actions 링크 포함 payload 생성/전송 |
 | Slack 배포 완료 알림 | `scripts/quality-gate/send-slack-deploy-success.py` | Quality Gate 통과 시 배포 완료 payload 생성/전송 |
 | EventBridge event | `scripts/quality-gate/publish-eventbridge-event.sh` | `DeploymentFailed` 이벤트를 만들고 `cd-quality-gate-prod-bus`로 발행 |
 | Approved action event | `.github/workflows/approved-action.yml`, `scripts/quality-gate/publish-approved-action-event.sh` | 운영자 승인 내용을 `DeploymentActionApproved` 이벤트로 발행 |
@@ -214,15 +223,17 @@ SLACK_CHANNEL=#cd-deploy-alarm
 흐름:
 
 ```text
-1. Prometheus alert 조회
-2. Prometheus metric 조회
-3. Quality Gate pass/fail 판단
-4. Grafana link 생성
-5. 실패하면 Slack 1차 알림 생성/전송
-6. 성공하면 Slack 배포 완료 알림 생성/전송
-7. 실패하면 EventBridge DeploymentFailed 이벤트 발행
-8. artifact 업로드
-9. 실패이면 workflow 자체를 실패 처리
+1. Kubernetes rollout 확인
+2. 5분 Health Check Window 실행
+3. 60초 간격으로 Prometheus alert/metric 조회
+4. 각 sample마다 Quality Gate pass/fail 판단
+5. 전체 window 결과를 quality-gate-result.json으로 집계
+6. Grafana link 생성
+7. 실패하면 Slack 1차 알림 생성/전송
+8. 성공하면 Slack 배포 완료 알림 생성/전송
+9. 실패하면 EventBridge DeploymentFailed 이벤트 발행
+10. artifact 업로드
+11. 실패이면 workflow 자체를 실패 처리
 ```
 
 아키텍처 흐름도에서는 `Quality Gate`, `Prometheus`, `Grafana`, `Slack 1st alert`, `EventBridge` 박스를 연결하는 파일이다.
@@ -495,6 +506,7 @@ grafana-links.json
 
 ```text
 SLACK_WEBHOOK_URL
+SLACK_WEBHOOK_SECRET_ARN
 SLACK_CHANNEL=#cd-deploy-alarm
 GITHUB_RUN_URL
 ```
@@ -664,7 +676,7 @@ failedAt
 6. build_summary()로 athena-summary 구조 생성
 7. write_summary_to_s3()로 S3 또는 local path에 summary 저장
 8. invoke_ai_agent()로 AI Agent 호출
-9. send_second_slack_alert()로 Slack 2차 알림 전송
+9. send_second_slack_alert()로 Secrets Manager의 Slack webhook을 읽고 Slack 2차 알림 전송
 ```
 
 아키텍처 흐름도에서는 `Lambda analysis orchestrator` 박스의 중심 파일이다.

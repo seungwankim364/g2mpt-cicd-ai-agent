@@ -17,7 +17,9 @@ ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "cd-quality-gate")
 ATHENA_OUTPUT_LOCATION = os.environ.get("ATHENA_OUTPUT_LOCATION", "")
 AI_AGENT_ENDPOINT = os.environ.get("AI_AGENT_ENDPOINT", "")
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
+SLACK_WEBHOOK_SECRET_ARN = os.environ.get("SLACK_WEBHOOK_SECRET_ARN", "")
 LOCAL_RESULT_DIR = os.environ.get("LOCAL_RESULT_DIR", "/tmp/cd-quality-gate-results")
+_SLACK_WEBHOOK_CACHE = None
 
 
 def parse_deployment_failed_event(event):
@@ -83,9 +85,14 @@ def build_summary(detail, query_results):
         "deploymentId": detail["deploymentId"],
         "service": detail["service"],
         "environment": detail["environment"],
+        "imageTag": detail.get("imageTag", "unknown"),
+        "rollbackImageTag": detail.get("rollbackImageTag", ""),
         "failedAt": detail["failedAt"],
         "analysisWindow": build_analysis_window(detail["failedAt"]),
         "alerts": detail.get("alerts", []),
+        "grafanaLinks": detail.get("grafanaLinks", {}),
+        "prometheusLinks": detail.get("prometheusLinks", {}),
+        "argocdUrl": detail.get("argocdUrl", ""),
         "signals": [
             {
                 "name": alert.get("alertName") or alert.get("labels", {}).get("alertname", "unknown"),
@@ -127,14 +134,28 @@ def invoke_ai_agent(summary):
         return json.loads(response.read().decode("utf-8"))
 
 
+def slack_webhook_url():
+    global _SLACK_WEBHOOK_CACHE
+    if SLACK_WEBHOOK_URL:
+        return SLACK_WEBHOOK_URL
+    if _SLACK_WEBHOOK_CACHE is not None:
+        return _SLACK_WEBHOOK_CACHE
+    if boto3 is None or not SLACK_WEBHOOK_SECRET_ARN:
+        return ""
+    response = boto3.client("secretsmanager").get_secret_value(SecretId=SLACK_WEBHOOK_SECRET_ARN)
+    _SLACK_WEBHOOK_CACHE = response.get("SecretString", "")
+    return _SLACK_WEBHOOK_CACHE
+
+
 def send_second_slack_alert(result):
-    if not SLACK_WEBHOOK_URL:
+    webhook_url = slack_webhook_url()
+    if not webhook_url:
         return {"status": "skipped", "reason": "SLACK_WEBHOOK_URL not set"}
     message = result.get("slackPayload") or {
         "text": result.get("slackMessage", {}).get("body") or result.get("summary", "AI analysis completed")
     }
     request = urllib.request.Request(
-        SLACK_WEBHOOK_URL,
+        webhook_url,
         data=json.dumps(message).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
