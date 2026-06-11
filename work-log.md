@@ -818,6 +818,41 @@ scripts/test-local.sh 통과
 terraform -chdir=infra/terraform fmt -check 통과
 ```
 
+### 2026-06-11 00:00 - GitOps automated sync 기준 아키텍처 문서와 draw.io 업데이트
+
+작업:
+
+```text
+GitHub Actions가 argocd app sync/wait를 직접 수행하는 표현을 제거했다.
+GitOps values-prod.yaml image tag push 후 Argo CD backend-api-prod automated sync로 배포되는 흐름을 문서와 draw.io에 반영했다.
+Prometheus는 외부 공개 URL이 아니라 self-hosted runner가 내부 service를 조회하는 구조로 표시했다.
+DOC-31에 runtime architecture tree를 추가해 실행 주체, 파일, secret, output을 한 번에 따라갈 수 있게 정리했다.
+DOC-13 tree 형식 아키텍처도 최신 실행 흐름으로 갱신했다.
+```
+
+수정 파일:
+
+```text
+cd-quality-gate-ai-incident-analysis.drawio
+README.md
+docs/10-architecture/04-architecture.md
+docs/10-architecture/05-detailed-flows.md
+docs/20-implementation/09-implementation-plan.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/90-reference/13-repository-architecture.md
+work-log.md
+```
+
+검증:
+
+```text
+오래된 argocd sync/wait 표현 검색 결과 없음
+draw.io 주요 라벨 GitOps automated sync 기준으로 변경 확인
+GitHub Actions YAML 파싱 통과
+scripts/test-local.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+```
+
 ### 2026-06-11 00:00 - gympt-ops 방식에 맞춘 GitOps/Prometheus/Argo CD 결정 반영
 
 작업:

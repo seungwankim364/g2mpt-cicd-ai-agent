@@ -13,7 +13,7 @@
 
 ```text
 1. GitHub Actions CD workflow에 post-deploy-health-check job 추가
-2. Argo CD app sync/wait 확인
+2. Argo CD automated sync 이후 Kubernetes rollout 확인
 3. kubectl rollout status 확인
 4. Prometheus API /api/v1/alerts 조회
 5. 관련 alert가 firing이면 job 실패 처리
@@ -136,4 +136,3 @@ Slack으로 분석 결과 전송
 rollback 결과 자동 검증
 성공/실패 Slack 알림
 ```
-

@@ -43,6 +43,8 @@ cd-quality-gate-architecture/
       23-security-and-iam-policy.md
       24-operations-runbook.md
       25-rollback-workflow-design.md
+      26-runtime-file-role-and-architecture-flow.md
+      27-github-secrets-and-runtime-values.md
     30-presentation/
       README.md
       10-expected-effects.md
@@ -97,6 +99,8 @@ cd-quality-gate-architecture/
 | `docs/20-implementation/23-security-and-iam-policy.md` | DOC-23 | 권한, secret, 보안 기준 |
 | `docs/20-implementation/24-operations-runbook.md` | DOC-26 | 운영자 장애 대응 절차 |
 | `docs/20-implementation/25-rollback-workflow-design.md` | DOC-27 | 승인 기반 rollback workflow 설계 |
+| `docs/20-implementation/26-runtime-file-role-and-architecture-flow.md` | DOC-31 | 실제 yml/sh/py/tf 파일이 아키텍처 흐름에서 수행하는 역할 |
+| `docs/20-implementation/27-github-secrets-and-runtime-values.md` | DOC-32 | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 |
 | `docs/30-presentation/10-expected-effects.md` | DOC-10 | 기대 효과와 팀원 파트 연결 |
 | `docs/30-presentation/11-presentation-notes.md` | DOC-11 | 발표 스크립트와 설명 포인트 |
 | `docs/30-presentation/12-demo-scenario.md` | DOC-24 | 발표/시연 시나리오 |
@@ -147,6 +151,8 @@ DOC-00 Overview
   -> DOC-27 Rollback Workflow Design
   -> DOC-28 Data Schema Reference
   -> DOC-30 GymPT Ops Connection Map
+  -> DOC-31 Runtime File Role and Architecture Flow
+  -> DOC-32 GitHub Secrets and Runtime Values
 ```
 
 발표 준비 흐름은 다음 순서가 적합하다.
@@ -192,7 +198,7 @@ Architecture Documents
   -> docs/10-architecture/
 
 Implementation Documents
-  -> DOC-08, DOC-09, DOC-14
+  -> DOC-08, DOC-09, DOC-14 ~ DOC-23, DOC-26, DOC-27, DOC-31, DOC-32
   -> docs/20-implementation/
 
 Presentation Support
@@ -202,6 +208,33 @@ Presentation Support
 Reference
   -> DOC-12, DOC-13
   -> docs/90-reference/
+```
+
+## 6.1 Runtime Flow Tree
+
+현재 확정된 실행 흐름은 다음 tree를 기준으로 한다. 상세 파일별 설명은 `DOC-31. Runtime File Role and Architecture Flow`를 따른다.
+
+```text
+GitHub Actions CD
+  -> scripts/cd/update-gitops-image-tag.sh
+  -> hj-3/gympt-gitops main
+    -> charts/backend-api/values-prod.yaml .image.tag 변경
+    -> Argo CD backend-api-prod automated sync
+      -> EKS gympt-prod/backend-api-prod rollout
+        -> Quality Gate on self-hosted runner
+          -> scripts/cd/check-k8s-rollout.sh
+          -> internal Prometheus API
+            -> scripts/quality-gate/query-prometheus-alerts.sh
+            -> scripts/quality-gate/query-prometheus-metrics.sh
+            -> scripts/quality-gate/evaluate-quality-gate.py
+              -> pass: scripts/quality-gate/send-slack-deploy-success.py
+              -> fail: scripts/quality-gate/send-slack-first-alert.py
+              -> fail: scripts/quality-gate/publish-eventbridge-event.sh
+                -> EventBridge cd-quality-gate-prod-bus
+                  -> Lambda analysis orchestrator
+                  -> Athena
+                  -> AI Agent
+                  -> Slack #cicd-deploy-alarm approval alert
 ```
 
 ## 7. 추천 사용 방식

@@ -6,14 +6,17 @@
 1. 개발자가 main 또는 dev 브랜치에 코드를 push한다.
 2. GitHub Actions가 Docker Image를 빌드한다.
 3. Image를 ECR에 push한다.
-4. GitOps Repository의 Helm values image tag를 수정한다.
-5. Argo CD가 변경 사항을 감지하고 EKS에 배포한다.
-6. GitHub Actions가 Argo CD app sync 상태를 확인한다.
-7. Kubernetes rollout status를 확인한다.
-8. Prometheus API를 호출하여 관련 alert 상태를 확인한다.
-9. backend-api, posture-analysis-service 등 대상 서비스의 메트릭을 확인한다.
-10. 문제가 없으면 CD job을 성공 처리한다.
-11. 필요 시 Slack으로 배포 성공 메시지를 보낸다.
+4. GitHub Actions가 `GITOPS_PAT`로 `hj-3/gympt-gitops` main branch를 checkout한다.
+5. `charts/backend-api/values-prod.yaml`의 `.image.tag`를 새 tag로 수정한다.
+6. GitOps 변경 commit을 main branch에 직접 push한다.
+7. Argo CD `backend-api-prod` Application이 Git 변경을 감지한다.
+8. Argo CD automated sync가 EKS `gympt-prod/backend-api-prod`에 배포한다.
+9. Quality Gate workflow가 EKS/VPC 내부 self-hosted runner에서 실행된다.
+10. Kubernetes rollout status를 확인한다.
+11. 내부 Prometheus API를 호출하여 관련 alert 상태를 확인한다.
+12. backend-api 대상 서비스의 메트릭을 확인한다.
+13. 문제가 없으면 CD job을 성공 처리한다.
+14. Slack `#cicd-deploy-alarm`으로 배포 완료 메시지를 보낸다.
 ```
 
 ## 2. 배포 실패 흐름
@@ -21,7 +24,7 @@
 ```text
 1. 새 버전이 배포된다.
 2. 배포 직후 5분 동안 Health Check Window를 둔다.
-3. Prometheus에서 firing 중인 alert를 조회한다.
+3. self-hosted runner가 내부 Prometheus에서 firing 중인 alert를 조회한다.
 4. 다음과 같은 문제가 감지된다.
    - 5xx Error Rate 증가
    - p95 Latency 증가
@@ -30,7 +33,7 @@
    - Readiness Probe 실패
 5. GitHub Actions job을 실패 처리한다.
 6. Slack으로 1차 알림을 보낸다.
-7. Slack 메시지에 Grafana, Prometheus, Argo CD 링크를 포함한다.
+7. Slack 메시지에 Grafana, Prometheus, Argo CD, GitHub Actions 링크를 포함한다.
 8. EventBridge에 DeploymentFailed 이벤트를 발행한다.
 9. EventBridge Rule이 Lambda 분석 오케스트레이터를 실행한다.
 10. Lambda가 Athena Query를 실행한다.
@@ -69,4 +72,3 @@
 7. 조치 후 Prometheus Health Check를 다시 실행한다.
 8. 결과를 Slack으로 다시 알린다.
 ```
-

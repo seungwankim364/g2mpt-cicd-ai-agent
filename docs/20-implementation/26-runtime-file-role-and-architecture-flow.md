@@ -35,12 +35,105 @@ Developer 또는 운영자
   -> Slack #cicd-deploy-alarm 2차 분석/승인 알림
 ```
 
+## 1.1 현재 확정된 runtime architecture tree
+
+아래 tree는 실제 실행 주체와 파일을 함께 보여준다. 이 tree를 기준으로 `cd-quality-gate-ai-incident-analysis.drawio`의 박스를 맞춘다.
+
+```text
+cd-quality-gate-runtime
+  cd-start
+    actor: Developer 또는 운영자
+    entrypoint: .github/workflows/cd.yml
+    input:
+      service: backend-api
+      environment: prod
+      image_tag: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:<tag>
+
+  gitops-update
+    runner: GitHub-hosted runner 가능
+    script: scripts/cd/update-gitops-image-tag.sh
+    secret:
+      GITOPS_PAT
+    target:
+      repo: hj-3/gympt-gitops
+      branch: main
+      file: charts/backend-api/values-prod.yaml
+      field: .image.tag
+    output:
+      GitOps commit
+
+  argocd-automated-sync
+    owner: gympt-ops
+    file: ../gympt-ops/gympt-gitops/argocd/applications/prod/backend-api.yaml
+    app: backend-api-prod
+    source:
+      repoURL: https://github.com/hj-3/gympt-gitops.git
+      targetRevision: main
+      path: charts/backend-api
+      valueFiles: values-prod.yaml
+    destination:
+      namespace: gympt-prod
+      deployment: backend-api-prod
+    behavior:
+      syncPolicy.automated.prune: true
+      syncPolicy.automated.selfHeal: true
+
+  quality-gate
+    entrypoint: .github/workflows/quality-gate.yml
+    runner: [self-hosted, linux, eks]
+    reason:
+      - internal Kubernetes rollout 확인 필요
+      - internal Prometheus service 접근 필요
+    first-check:
+      script: scripts/cd/check-k8s-rollout.sh
+      reads:
+        K8S_NAMESPACE: gympt-prod
+        K8S_DEPLOYMENT: backend-api-prod
+
+    prometheus
+      url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+      query-alerts:
+        script: scripts/quality-gate/query-prometheus-alerts.sh
+        output: prometheus-alerts.json
+      query-metrics:
+        script: scripts/quality-gate/query-prometheus-metrics.sh
+        output: prometheus-metrics.json
+
+    decision
+      script: scripts/quality-gate/evaluate-quality-gate.py
+      input: prometheus-alerts.json
+      output: quality-gate-result.json
+      pass:
+        script: scripts/quality-gate/send-slack-deploy-success.py
+        output: slack-deploy-success.json
+      fail:
+        grafana-link-script: scripts/quality-gate/build-grafana-links.py
+        first-alert-script: scripts/quality-gate/send-slack-first-alert.py
+        event-script: scripts/quality-gate/publish-eventbridge-event.sh
+        event-bus: cd-quality-gate-prod-bus
+
+  ai-incident-analysis
+    trigger: EventBridge DeploymentFailed
+    lambda: lambda/analysis-orchestrator/app.py
+    athena-template: athena/templates/backend-api.json
+    athena-queries: athena/queries/*.sql
+    ai-agent:
+      analyzer: ai-agent/app/analyzer.py
+      runbook-loader: ai-agent/app/runbook_loader.py
+      slack-builder: ai-agent/app/slack_message_builder.py
+    output:
+      slack-channel: #cicd-deploy-alarm
+      message: rollback / DR / change approval recommendation
+```
+
+중요한 점은 `argocd app sync`가 기본 CD 실행 파일이 아니라는 것이다. 현재 확정 구조에서는 GitOps commit이 desired state 변경이고, Argo CD는 그 변경을 자동으로 sync한다.
+
 ## 2. draw.io 박스와 실제 파일 매핑
 
 | draw.io 영역 | 실제 파일 | 역할 |
 | --- | --- | --- |
 | GitHub Actions CD | `.github/workflows/cd.yml` | CD 시작점. image tag 입력을 받고 GitOps 수정 후 Quality Gate workflow 호출 |
-| GitOps image tag update | `scripts/cd/update-gitops-image-tag.sh` | `GITOPS_REPO`를 clone하고 `VALUES_FILE`의 `tag:` 값을 `IMAGE_TAG`로 변경 |
+| GitOps image tag update | `scripts/cd/update-gitops-image-tag.sh` | `GITOPS_PAT`로 `hj-3/gympt-gitops`를 clone하고 `charts/backend-api/values-prod.yaml`의 `.image.tag`를 `IMAGE_TAG`로 변경 후 main에 push |
 | Argo CD automated sync | `argocd/applications/prod/backend-api.yaml` in `gympt-ops` | GitOps 변경을 감지해 `backend-api-prod`를 자동 sync |
 | Kubernetes rollout | `scripts/cd/check-k8s-rollout.sh` | self-hosted runner에서 `K8S_NAMESPACE=gympt-prod`, `K8S_DEPLOYMENT=backend-api-prod` rollout 상태 확인 |
 | Quality Gate | `.github/workflows/quality-gate.yml` | Prometheus 조회, gate 판단, Slack 알림, EventBridge 발행을 순서대로 실행 |
@@ -160,7 +253,7 @@ SLACK_CHANNEL=#cicd-deploy-alarm
 역할:
 
 ```text
-GitOps repository의 values file에서 image tag를 새 배포 tag로 변경한다.
+GitOps repository의 values file에서 image tag를 새 배포 tag로 변경하고 main branch에 push한다.
 ```
 
 읽는 값:
@@ -170,19 +263,21 @@ SERVICE_NAME
 ENVIRONMENT
 IMAGE_TAG
 GITOPS_REPO
+GITOPS_PAT
 VALUES_FILE
 ```
 
 실제 동작:
 
 ```text
-1. GITOPS_REPO가 없으면 dry-run으로 종료
-2. GitOps repository clone
+1. GITOPS_REPO, GITOPS_PAT, VALUES_FILE 중 하나라도 없으면 dry-run으로 종료
+2. https://x-access-token:<GITOPS_PAT>@github.com/hj-3/gympt-gitops.git 형태로 GitOps repository clone
 3. VALUES_FILE 존재 확인
-4. tag: 값을 IMAGE_TAG로 치환
-5. git commit
-6. git push
-7. 변경 commit SHA 출력
+4. yq가 있으면 .image.tag를 IMAGE_TAG로 치환
+5. yq가 없으면 sed fallback으로 tag 값을 치환
+6. github-actions[bot] author로 git commit 생성
+7. origin main rebase 후 main branch에 push
+8. 변경 commit SHA 출력
 ```
 
 `gympt-ops` 기준 연결값:
@@ -190,9 +285,39 @@ VALUES_FILE
 ```text
 VALUES_FILE=charts/backend-api/values-prod.yaml
 image repository=337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api
+target repository=hj-3/gympt-gitops
+target branch=main
 ```
 
-아키텍처 흐름도에서는 GitHub Actions가 GitOps repo에 변경을 넣는 화살표에 해당한다.
+아키텍처 흐름도에서는 GitHub Actions가 GitOps repo에 desired state 변경을 넣는 화살표에 해당한다. 이 commit이 들어가면 Argo CD가 자동으로 sync한다.
+
+### Argo CD automated sync
+
+역할:
+
+```text
+hj-3/gympt-gitops main branch 변경을 감지해 backend-api-prod를 EKS에 자동 배포한다.
+```
+
+기준 파일:
+
+```text
+../gympt-ops/gympt-gitops/argocd/applications/prod/backend-api.yaml
+```
+
+핵심 설정:
+
+```text
+repoURL=https://github.com/hj-3/gympt-gitops.git
+targetRevision=main
+path=charts/backend-api
+valueFiles=values-prod.yaml
+destination namespace=gympt-prod
+syncPolicy.automated.prune=true
+syncPolicy.automated.selfHeal=true
+```
+
+이 단계는 이 저장소에서 실행하는 script가 아니다. `gympt-ops`에 이미 존재하는 Argo CD Application이 수행한다.
 
 ### `scripts/cd/wait-argocd-app.sh`
 
@@ -715,7 +840,7 @@ GitHub Actions CD
 ```text
 .github/workflows/cd.yml
 scripts/cd/update-gitops-image-tag.sh
-scripts/cd/wait-argocd-app.sh
+../gympt-ops/gympt-gitops/argocd/applications/prod/backend-api.yaml
 scripts/cd/check-k8s-rollout.sh
 .github/workflows/quality-gate.yml
 scripts/quality-gate/query-prometheus-alerts.sh

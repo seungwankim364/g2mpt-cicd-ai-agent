@@ -45,14 +45,14 @@ GitHub Actions CD
 
 ## 현재 구현 상태
 
-`docs/10-architecture`와 `docs/20-implementation/14-implementation-file-architecture.md` 기준으로 실제 구현 scaffold를 채워둔 상태다. 외부 AWS, Slack, Prometheus는 실제 값을 넣기 전에도 fixture와 dry-run으로 흐름을 확인할 수 있다.
+`docs/10-architecture`와 `docs/20-implementation/14-implementation-file-architecture.md` 기준으로 실제 구현 scaffold를 채워둔 상태다. AWS, Slack, 내부 Prometheus는 실제 값을 넣기 전에도 fixture와 dry-run으로 흐름을 확인할 수 있다.
 
 | 구분 | 위치 | 설명 |
 | --- | --- | --- |
-| CD workflow | [.github/workflows/cd.yml](.github/workflows/cd.yml) | GitOps update, Argo CD wait, rollout 확인 후 Quality Gate 호출 |
+| CD workflow | [.github/workflows/cd.yml](.github/workflows/cd.yml) | GitOps values tag push 후 Argo CD automated sync 트리거 |
 | Quality Gate workflow | [.github/workflows/quality-gate.yml](.github/workflows/quality-gate.yml) | Prometheus 조회, Gate 판단, Slack/EventBridge 연동 |
 | 샘플 workflow | [.github/workflows/cd-quality-gate-sample.yml](.github/workflows/cd-quality-gate-sample.yml) | fixture 기반 Quality Gate 실행 예시 |
-| CD 스크립트 | [scripts/cd](scripts/cd) | GitOps image tag 수정, Argo CD 대기, rollout 확인 |
+| CD 스크립트 | [scripts/cd](scripts/cd) | GitOps image tag 수정, rollout 확인, Argo CD 수동 sync 보조 도구 |
 | 서비스 설정 | [config/services/backend-api.yaml](config/services/backend-api.yaml) | backend-api 기준 서비스 설정 |
 | Quality Gate 설정 | [config/quality-gate](config/quality-gate) | threshold, alert mapping, Grafana dashboard 설정 |
 | Prometheus 조회 | [scripts/quality-gate/query-prometheus-alerts.sh](scripts/quality-gate/query-prometheus-alerts.sh) | Prometheus alert 조회 또는 fixture 사용 |
