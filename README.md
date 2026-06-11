@@ -65,6 +65,10 @@ Existing gympt-ops CI/CD
 | Slack 배포 완료 알림 | [scripts/quality-gate/send-slack-deploy-success.py](scripts/quality-gate/send-slack-deploy-success.py) | Quality Gate 통과 후 배포 완료 payload 생성 또는 전송 |
 | EventBridge 발행 | [scripts/quality-gate/publish-eventbridge-event.sh](scripts/quality-gate/publish-eventbridge-event.sh) | `DeploymentFailed` 이벤트 payload 생성/발행 |
 | Slack 승인 자동 실행 | [lambda/slack-approval-handler](lambda/slack-approval-handler), [lambda/deployment-action-executor](lambda/deployment-action-executor) | Slack 승인 버튼 수신 후 rollback/DR/manual fix/change workflow 자동 dispatch |
+| Rollback 요청 workflow | [.github/workflows/rollback.yml](.github/workflows/rollback.yml) | 승인 후 기존 GitOps/PAT 보유 repo의 rollback workflow를 호출 |
+| DR 요청 workflow | [.github/workflows/dr-failover.yml](.github/workflows/dr-failover.yml) | 승인 후 기존 권한 보유 repo의 DR failover workflow를 자동 호출 |
+| Manual fix workflow | [.github/workflows/manual-fix.yml](.github/workflows/manual-fix.yml) | 승인 후 수동 조치 이슈와 실행 기록 생성 |
+| Change apply workflow | [.github/workflows/change-apply.yml](.github/workflows/change-apply.yml) | 승인 후 change 실행 기록과 이슈 생성 |
 | Lambda 패키징 | [scripts/lambda/package-analysis-orchestrator.sh](scripts/lambda/package-analysis-orchestrator.sh) | Terraform apply 전 `ai-agent`, runbook, Athena query를 포함한 `build/analysis-orchestrator.zip` 생성 |
 | Runbook | [scripts/runbooks](scripts/runbooks) | alert별 운영 확인 스크립트 |
 | Lambda Orchestrator | [lambda/analysis-orchestrator](lambda/analysis-orchestrator) | EventBridge 이후 Athena/AI/Slack 분석 오케스트레이션 |
@@ -92,6 +96,10 @@ Existing gympt-ops CI/CD
 | 알림 종류 | 배포 완료, CD 실패 1차 알림, AI 분석/rollback/DR/change 승인 알림 |
 
 Slack 2차 알림의 승인 버튼을 누르면 API Gateway가 `slack-approval-handler`를 호출하고, `DeploymentActionApproved` 이벤트를 거쳐 `deployment-action-executor`가 action type별 GitHub workflow를 자동 실행한다. 실제 rollback/DR 동작은 Terraform 변수에 지정한 대상 repository workflow가 수행한다.
+
+자동 rollback과 DR은 이 repo가 GitOps/AWS 운영 리소스를 직접 수정하지 않고, 기존 권한이 있는 GitOps/gympt-ops 쪽 workflow를 호출한다. manual fix/change는 현재 이 repo의 workflow가 승인 기록과 후속 작업을 자동 생성한다.
+
+각 승인 action workflow는 조치 요청 이후 `gympt-app` 배포 workflow를 다시 dispatch한다. 기존 app 배포 workflow는 배포 완료 후 `cd-quality-gate-architecture`의 `quality-gate.yml`을 호출해야 하며, Quality Gate가 통과하면 Slack `#cd-deploy-alarm`으로 배포 완료 알림을 보낸다.
 
 ServiceMonitor 정합성 확인 결과, 기존 `platform/monitoring/servicemonitor-backend-api.yaml`는 dev namespace인 `backend-api` 기준이지만, Helm chart 내부 ServiceMonitor template은 `.Release.Namespace`를 사용한다. `backend-api-prod` Application의 destination namespace는 `gympt-prod`이므로 Quality Gate는 `gympt-prod` 기준으로 평가한다.
 

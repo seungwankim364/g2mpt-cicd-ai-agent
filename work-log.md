@@ -1173,6 +1173,104 @@ terraform -chdir=infra/terraform fmt -check 통과
 Slack 2차 알림 payload에 Approve rollback 버튼 포함 확인
 ```
 
+### 2026-06-11 16:18 - 승인 action 대상 workflow 4개 추가
+
+작업:
+
+```text
+deployment-action-executor가 같은 repo에서 dispatch할 rollback/dr/manual_fix/change workflow를 추가했다.
+rollback.yml은 승인된 target_image_tag를 기존 GitOps/gympt-ops rollback workflow에 전달한다.
+dr-failover.yml은 DR 승인 실행 기록을 생성하고 실제 DR 명령 연결 지점을 남긴다.
+manual-fix.yml은 수동 조치 이슈와 실행 기록을 생성한다.
+change-apply.yml은 승인된 change 실행 기록과 이슈를 생성한다.
+Terraform workflow repo 기본값을 seungwankim364/g2mpt-cicd-ai-agent로 설정했다.
+```
+
+추가 파일:
+
+```text
+.github/workflows/rollback.yml
+.github/workflows/dr-failover.yml
+.github/workflows/manual-fix.yml
+.github/workflows/change-apply.yml
+```
+
+주의:
+
+```text
+rollback.yml이 기존 rollback workflow를 호출하려면 이 repo GitHub Secret에 GH_WORKFLOW_DISPATCH_TOKEN이 필요하다.
+GitOps push용 GITOPS_PAT는 기존 GitOps/gympt-ops repo에 있는 값을 사용한다.
+DR 전환은 서비스별 실제 DR 명령이 정해지면 dr-failover.yml에 연결한다.
+```
+
+### 2026-06-11 16:25 - rollback이 이 repo에서 GitOps를 직접 수정하지 않도록 정정
+
+작업:
+
+```text
+기존 GitOps repo에 GITOPS_PAT가 이미 있으므로, 이 repo에 GITOPS_PAT를 추가하지 않는 방향으로 rollback.yml을 수정했다.
+rollback.yml은 GitOps values를 직접 수정하지 않고, 기존 GitOps/gympt-ops rollback workflow를 dispatch한다.
+문서에서 이 repo에 GITOPS_PAT가 필요하다는 문구를 제거하고 GH_WORKFLOW_DISPATCH_TOKEN 필요 조건으로 바꿨다.
+```
+
+### 2026-06-11 16:47 - 조치 후 gympt-app 배포 workflow 재실행 연결
+
+작업:
+
+```text
+rollback, DR, manual fix, change 승인 workflow가 조치 후 기존 gympt-app 배포 workflow를 다시 dispatch하도록 연결했다.
+deployment-action-executor가 app_repo, app_workflow, app_ref 값을 action workflow에 전달하도록 수정했다.
+공통 GitHub workflow dispatch 스크립트를 추가했다.
+배포 완료 Slack 알림은 gympt-app 배포 workflow가 마지막에 quality-gate.yml을 호출하는 계약으로 정리했다.
+```
+
+추가 파일:
+
+```text
+scripts/github/dispatch-workflow.py
+```
+
+수정 파일:
+
+```text
+.github/workflows/rollback.yml
+.github/workflows/dr-failover.yml
+.github/workflows/manual-fix.yml
+.github/workflows/change-apply.yml
+lambda/deployment-action-executor/app.py
+infra/terraform/lambda.tf
+infra/terraform/variables.tf
+README.md
+docs/20-implementation/25-rollback-workflow-design.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+work-log.md
+```
+
+주의:
+
+```text
+gympt-app 배포 workflow는 workflow_dispatch 입력을 받아야 한다.
+gympt-app 배포 workflow 마지막에는 cd-quality-gate-architecture의 quality-gate.yml 호출이 있어야 Slack 배포 완료 알림까지 이어진다.
+```
+
+### 2026-06-11 16:32 - draw.io 기준 누락/불일치 점검
+
+작업:
+
+```text
+cd-quality-gate-ai-incident-analysis.drawio의 주요 노드와 현재 구현 파일을 대조했다.
+Bedrock은 실제 구현되어 있지 않고 현재 ai-agent/runbook reasoning 구조임을 확인했다.
+rollback 문서에 남아 있던 직접 GitOps rollback/Quality Gate 재검증 책임 표현을 기존 GitOps/gympt-ops workflow 책임으로 정정했다.
+```
+
+남은 확인 항목:
+
+```text
+Athena가 읽을 central logs S3/Glue external table은 실제 gympt-ops 로그 저장소와 연결 확인 필요
+Slack approval/API Gateway/action executor는 구현됐지만 draw.io에는 아직 별도 박스로 반영되지 않음
+DR 실제 전환 명령은 dr-failover.yml에 아직 연결 필요
+```
+
 ### 2026-06-11 16:03 - 1차 Slack 알림 링크 보강
 
 작업:

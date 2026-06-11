@@ -73,6 +73,9 @@ resource "aws_lambda_function" "deployment_action_executor" {
       MANUAL_FIX_WORKFLOW_REPO = var.manual_fix_workflow_repo
       CHANGE_WORKFLOW_REPO     = var.change_workflow_repo
       WORKFLOW_REF             = "main"
+      APP_DEPLOY_WORKFLOW_REPO = var.app_deploy_workflow_repo
+      APP_DEPLOY_WORKFLOW_FILE = var.app_deploy_workflow_file
+      APP_DEPLOY_WORKFLOW_REF  = var.app_deploy_workflow_ref
     }
   }
 

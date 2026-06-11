@@ -1,0 +1,108 @@
+name: Execute Manual Fix Request
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        required: true
+      service:
+        required: true
+        default: backend-api
+      environment:
+        required: true
+        default: prod
+      action_type:
+        required: true
+        default: manual_fix
+      approved_by:
+        required: true
+      reason:
+        required: true
+      current_image_tag:
+        required: false
+        default: unknown
+      target_image_tag:
+        required: false
+        default: ""
+      app_repo:
+        required: false
+        default: hj-3/gympt-app
+      app_workflow:
+        required: false
+        default: backend-api-ci.yml
+      app_ref:
+        required: false
+        default: main
+
+jobs:
+  manual-fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    env:
+      DISPATCH_TOKEN: ${{ secrets.GH_WORKFLOW_DISPATCH_TOKEN }}
+      APP_REPO: ${{ inputs.app_repo }}
+      APP_WORKFLOW: ${{ inputs.app_workflow }}
+      APP_REF: ${{ inputs.app_ref }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate manual fix approval
+        run: |
+          test "${{ inputs.action_type }}" = "manual_fix"
+          if [ -z "$DISPATCH_TOKEN" ]; then
+            echo "GH_WORKFLOW_DISPATCH_TOKEN is required to call the app deployment workflow." >&2
+            exit 2
+          fi
+
+      - name: Create manual fix record
+        run: |
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          record = {
+              "deploymentId": "${{ inputs.deployment_id }}",
+              "service": "${{ inputs.service }}",
+              "environment": "${{ inputs.environment }}",
+              "actionType": "manual_fix",
+              "approvedBy": "${{ inputs.approved_by }}",
+              "reason": "${{ inputs.reason }}",
+              "currentImageTag": "${{ inputs.current_image_tag }}",
+              "startedAt": datetime.now(timezone.utc).isoformat(),
+              "status": "manual_fix_requested"
+          }
+          open("manual-fix-request.json", "w", encoding="utf-8").write(json.dumps(record, indent=2) + "\n")
+          PY
+
+      - name: Create GitHub issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "[Manual Fix] ${{ inputs.service }} ${{ inputs.deployment_id }}" \
+            --body-file manual-fix-request.json \
+            --label "cd-quality-gate" \
+            --label "manual-fix" || true
+
+      - name: Dispatch gympt-app deployment workflow
+        run: |
+          scripts/github/dispatch-workflow.py \
+            --repo "$APP_REPO" \
+            --workflow "$APP_WORKFLOW" \
+            --ref "$APP_REF" \
+            --token "$DISPATCH_TOKEN" \
+            --input "service=${{ inputs.service }}" \
+            --input "environment=${{ inputs.environment }}" \
+            --input "image_tag=${{ inputs.target_image_tag }}" \
+            --input "source_action=manual_fix" \
+            --input "deployment_id=${{ inputs.deployment_id }}"
+
+      - name: Upload manual fix record
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-fix-request
+          path: manual-fix-request.json

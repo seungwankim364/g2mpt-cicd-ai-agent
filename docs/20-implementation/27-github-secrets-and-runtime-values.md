@@ -26,6 +26,8 @@ AWS Lambda는 가능하면 AWS Secrets Manager에서 secret을 읽는다.
 
 `GITOPS_PAT`는 기존 `gympt-ops` app CI/CD가 GitOps values update를 수행할 때 사용하는 secret이다. 이 저장소는 기존 배포 앞단을 다시 수행하지 않으므로 `GITOPS_PAT`를 필수 secret으로 받지 않는다.
 
+Slack 승인 후 자동 rollback도 이 저장소가 GitOps를 직접 수정하지 않는다. 기존 `GITOPS_PAT`가 있는 GitOps/gympt-ops 쪽 rollback workflow를 호출한다.
+
 대체 방식:
 
 | Secret name | 필수 | 읽는 위치 | 사용 목적 |
@@ -54,6 +56,7 @@ Repository
 PROMETHEUS_URL
 SLACK_WEBHOOK_URL
 AWS_ROLE_ARN
+GH_WORKFLOW_DISPATCH_TOKEN   # 기존 GitOps/gympt-ops rollback workflow 호출 시 필요
 ```
 
 ## 4. GitHub Variables 입력 위치
@@ -84,6 +87,9 @@ Repository
 | `GITHUB_TOKEN_SECRET_ARN` | unset | Terraform variable `github_token_secret_arn` | 승인 후 대상 GitHub workflow 자동 dispatch용 token secret |
 | `ROLLBACK_WORKFLOW_REPO` | unset | Terraform variable `rollback_workflow_repo` | rollback 승인 시 dispatch할 repository |
 | `DR_WORKFLOW_REPO` | unset | Terraform variable `dr_workflow_repo` | DR 승인 시 dispatch할 repository |
+| `APP_DEPLOY_WORKFLOW_REPO` | `hj-3/gympt-app` | Terraform variable `app_deploy_workflow_repo` | 조치 후 처음부터 다시 실행할 app 배포 workflow repository |
+| `APP_DEPLOY_WORKFLOW_FILE` | `backend-api-ci.yml` | Terraform variable `app_deploy_workflow_file` | 조치 후 다시 실행할 app 배포 workflow |
+| `APP_DEPLOY_WORKFLOW_REF` | `main` | Terraform variable `app_deploy_workflow_ref` | app 배포 workflow 실행 branch/ref |
 
 MVP에서는 코드에 고정된 값을 유지해도 된다. 여러 환경으로 확장할 때 GitHub Variables로 분리한다.
 

@@ -10,6 +10,9 @@ except ImportError:
 
 GITHUB_API = "https://api.github.com"
 GITHUB_TOKEN_SECRET_ARN = os.environ.get("GITHUB_TOKEN_SECRET_ARN", "")
+APP_DEPLOY_WORKFLOW_REPO = os.environ.get("APP_DEPLOY_WORKFLOW_REPO", "")
+APP_DEPLOY_WORKFLOW_FILE = os.environ.get("APP_DEPLOY_WORKFLOW_FILE", "backend-api-ci.yml")
+APP_DEPLOY_WORKFLOW_REF = os.environ.get("APP_DEPLOY_WORKFLOW_REF", "main")
 
 WORKFLOW_REPOS = {
     "rollback": os.environ.get("ROLLBACK_WORKFLOW_REPO", ""),
@@ -47,6 +50,9 @@ def _dispatch_workflow(repo, workflow_file, token, detail):
             "reason": detail.get("reason", ""),
             "current_image_tag": detail.get("currentImageTag", "unknown"),
             "target_image_tag": detail.get("targetImageTag", ""),
+            "app_repo": APP_DEPLOY_WORKFLOW_REPO,
+            "app_workflow": APP_DEPLOY_WORKFLOW_FILE,
+            "app_ref": APP_DEPLOY_WORKFLOW_REF,
         },
     }
     request = urllib.request.Request(

@@ -47,20 +47,35 @@ variable "github_token_secret_arn" {
 
 variable "rollback_workflow_repo" {
   type    = string
-  default = ""
+  default = "seungwankim364/g2mpt-cicd-ai-agent"
 }
 
 variable "dr_workflow_repo" {
   type    = string
-  default = ""
+  default = "seungwankim364/g2mpt-cicd-ai-agent"
 }
 
 variable "manual_fix_workflow_repo" {
   type    = string
-  default = ""
+  default = "seungwankim364/g2mpt-cicd-ai-agent"
 }
 
 variable "change_workflow_repo" {
   type    = string
-  default = ""
+  default = "seungwankim364/g2mpt-cicd-ai-agent"
+}
+
+variable "app_deploy_workflow_repo" {
+  type    = string
+  default = "hj-3/gympt-app"
+}
+
+variable "app_deploy_workflow_file" {
+  type    = string
+  default = "backend-api-ci.yml"
+}
+
+variable "app_deploy_workflow_ref" {
+  type    = string
+  default = "main"
 }
