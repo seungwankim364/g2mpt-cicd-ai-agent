@@ -27,6 +27,12 @@ def build_message(result: dict, links: dict, github_run_url: str | None) -> dict
     grafana_url = links.get("grafana", {}).get("dashboard")
     if grafana_url:
         link_lines.append(f"Grafana: {grafana_url}")
+    prometheus_url = links.get("prometheus", {}).get("alerts")
+    if prometheus_url:
+        link_lines.append(f"Prometheus Alerts: {prometheus_url}")
+    argocd_url = links.get("argocd")
+    if argocd_url:
+        link_lines.append(f"Argo CD: {argocd_url}")
     if github_run_url:
         link_lines.append(f"GitHub Actions: {github_run_url}")
 

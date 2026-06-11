@@ -134,11 +134,15 @@ cd-quality-gate-runtime
 | Prometheus metrics | `scripts/quality-gate/query-prometheus-metrics.sh` | 배포 직후 판단에 필요한 metric snapshot을 조회 |
 | Gate decision | `scripts/quality-gate/evaluate-quality-gate.py` | firing alert 중 서비스/namespace/alert name이 일치하는 항목이 있으면 실패 처리 |
 | Grafana links | `scripts/quality-gate/build-grafana-links.py` | Slack 메시지에 넣을 Grafana dashboard URL 생성 |
-| Slack 1차 실패 알림 | `scripts/quality-gate/send-slack-first-alert.py` | CD 실패 즉시 `#cd-deploy-alarm`에 1차 알림 payload 생성/전송 |
+| Slack 1차 실패 알림 | `scripts/quality-gate/send-slack-first-alert.py` | CD 실패 즉시 `#cd-deploy-alarm`에 alert, Grafana, Prometheus, Argo CD, GitHub Actions 링크 포함 payload 생성/전송 |
 | Slack 배포 완료 알림 | `scripts/quality-gate/send-slack-deploy-success.py` | Quality Gate 통과 시 배포 완료 payload 생성/전송 |
 | EventBridge event | `scripts/quality-gate/publish-eventbridge-event.sh` | `DeploymentFailed` 이벤트를 만들고 `cd-quality-gate-prod-bus`로 발행 |
+| Approved action event | `.github/workflows/approved-action.yml`, `scripts/quality-gate/publish-approved-action-event.sh` | 운영자 승인 내용을 `DeploymentActionApproved` 이벤트로 발행 |
+| Slack approval handler | `lambda/slack-approval-handler/app.py`, `infra/terraform/apigateway.tf` | Slack 승인 버튼 요청을 검증하고 승인 이벤트를 EventBridge에 발행 |
+| Deployment action executor | `lambda/deployment-action-executor/app.py` | 승인 이벤트를 받아 rollback/DR/manual fix/change workflow를 자동 dispatch |
 | EventBridge bus/rule | `infra/terraform/eventbridge.tf` | 전용 bus와 `DeploymentFailed` rule 정의 |
 | Lambda target | `infra/terraform/lambda.tf` | EventBridge 이후 실행될 Lambda와 환경변수 정의 |
+| Lambda package | `scripts/lambda/package-analysis-orchestrator.sh` | Terraform이 참조하는 `build/analysis-orchestrator.zip` 생성. `ai-agent`, runbook, Athena query 포함 |
 | Lambda Orchestrator | `lambda/analysis-orchestrator/app.py` | 이벤트 수신, Athena query 실행, summary 생성, AI Agent 호출, Slack 2차 알림 전송 |
 | Athena query template | `athena/templates/backend-api.json` | backend-api 실패 시 실행할 SQL 목록 정의 |
 | Athena SQL | `athena/queries/*.sql` | ALB, application, WAF 등 로그 분석 query |
@@ -568,6 +572,43 @@ aws events put-events --event-bus-name cd-quality-gate-prod-bus
 ```
 
 아키텍처 흐름도에서는 GitHub Actions에서 AWS EventBridge로 넘어가는 연결이다.
+
+## 5.1 Lambda 패키징 script 역할
+
+### `scripts/lambda/package-analysis-orchestrator.sh`
+
+역할:
+
+```text
+Terraform apply 전에 Lambda 배포 zip을 만든다.
+```
+
+생성 파일:
+
+```text
+build/analysis-orchestrator.zip
+```
+
+zip에 포함되는 파일:
+
+```text
+app.py
+ai_agent_adapter.py
+ai_agent/analyzer.py
+ai_agent/runbook_loader.py
+ai_agent/slack_message_builder.py
+athena/queries/*.sql
+athena/templates/*.json
+scripts/runbooks/*.sh
+```
+
+실행:
+
+```bash
+scripts/lambda/package-analysis-orchestrator.sh
+```
+
+이 파일이 없으면 `infra/terraform/lambda.tf`의 `filename = "build/analysis-orchestrator.zip"` 때문에 Terraform apply가 실패한다.
 
 ## 6. Terraform yml/tf 역할
 

@@ -64,6 +64,8 @@ Existing gympt-ops CI/CD
 | Slack 1차 알림 | [scripts/quality-gate/send-slack-first-alert.py](scripts/quality-gate/send-slack-first-alert.py) | 실패 알림 payload 생성 또는 전송 |
 | Slack 배포 완료 알림 | [scripts/quality-gate/send-slack-deploy-success.py](scripts/quality-gate/send-slack-deploy-success.py) | Quality Gate 통과 후 배포 완료 payload 생성 또는 전송 |
 | EventBridge 발행 | [scripts/quality-gate/publish-eventbridge-event.sh](scripts/quality-gate/publish-eventbridge-event.sh) | `DeploymentFailed` 이벤트 payload 생성/발행 |
+| Slack 승인 자동 실행 | [lambda/slack-approval-handler](lambda/slack-approval-handler), [lambda/deployment-action-executor](lambda/deployment-action-executor) | Slack 승인 버튼 수신 후 rollback/DR/manual fix/change workflow 자동 dispatch |
+| Lambda 패키징 | [scripts/lambda/package-analysis-orchestrator.sh](scripts/lambda/package-analysis-orchestrator.sh) | Terraform apply 전 `ai-agent`, runbook, Athena query를 포함한 `build/analysis-orchestrator.zip` 생성 |
 | Runbook | [scripts/runbooks](scripts/runbooks) | alert별 운영 확인 스크립트 |
 | Lambda Orchestrator | [lambda/analysis-orchestrator](lambda/analysis-orchestrator) | EventBridge 이후 Athena/AI/Slack 분석 오케스트레이션 |
 | AI Agent | [ai-agent](ai-agent) | Athena summary와 alert를 바탕으로 원인 후보와 조치 추천 생성 |
@@ -88,6 +90,8 @@ Existing gympt-ops CI/CD
 | Infra 관리 | Terraform 기준 |
 | 비용 태그 | `Project=cd-quality-gate`, `Environment=dev/prod`, `CostControl=auto-stop` |
 | 알림 종류 | 배포 완료, CD 실패 1차 알림, AI 분석/rollback/DR/change 승인 알림 |
+
+Slack 2차 알림의 승인 버튼을 누르면 API Gateway가 `slack-approval-handler`를 호출하고, `DeploymentActionApproved` 이벤트를 거쳐 `deployment-action-executor`가 action type별 GitHub workflow를 자동 실행한다. 실제 rollback/DR 동작은 Terraform 변수에 지정한 대상 repository workflow가 수행한다.
 
 ServiceMonitor 정합성 확인 결과, 기존 `platform/monitoring/servicemonitor-backend-api.yaml`는 dev namespace인 `backend-api` 기준이지만, Helm chart 내부 ServiceMonitor template은 `.Release.Namespace`를 사용한다. `backend-api-prod` Application의 destination namespace는 `gympt-prod`이므로 Quality Gate는 `gympt-prod` 기준으로 평가한다.
 

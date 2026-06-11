@@ -130,7 +130,9 @@ def invoke_ai_agent(summary):
 def send_second_slack_alert(result):
     if not SLACK_WEBHOOK_URL:
         return {"status": "skipped", "reason": "SLACK_WEBHOOK_URL not set"}
-    message = {"text": result.get("slackMessage", {}).get("body") or result.get("summary", "AI analysis completed")}
+    message = result.get("slackPayload") or {
+        "text": result.get("slackMessage", {}).get("body") or result.get("summary", "AI analysis completed")
+    }
     request = urllib.request.Request(
         SLACK_WEBHOOK_URL,
         data=json.dumps(message).encode("utf-8"),
@@ -162,4 +164,3 @@ def handler(event, context):
 if __name__ == "__main__":
     sample = json.loads(Path("lambda/analysis-orchestrator/events/deployment-failed.sample.json").read_text())
     print(json.dumps(handler(sample, None), indent=2))
-

@@ -1010,3 +1010,196 @@ work-log.md
 GitHub Actions YAML 파싱 통과
 terraform -chdir=infra/terraform fmt -check 통과
 ```
+
+### 2026-06-11 15:34 - Lambda analysis orchestrator zip 패키징
+
+작업:
+
+```text
+Terraform apply 전에 필요한 Lambda 배포 zip을 생성하는 스크립트를 추가했다.
+build/analysis-orchestrator.zip을 생성했다.
+zip에는 app.py, ai_agent_adapter.py, athena query, athena template을 포함했다.
+build/는 산출물이므로 .gitignore에 추가했다.
+```
+
+추가 파일:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh
+```
+
+수정 파일:
+
+```text
+.gitignore
+README.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+work-log.md
+```
+
+생성 산출물:
+
+```text
+build/analysis-orchestrator.zip
+```
+
+검증:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh 실행 성공
+unzip -l build/analysis-orchestrator.zip로 app.py, ai_agent_adapter.py, athena/queries, athena/templates 포함 확인
+python3 -m py_compile로 Lambda Python 파일 컴파일 확인
+```
+
+### 2026-06-11 15:41 - Lambda와 ai-agent 실제 연결
+
+작업:
+
+```text
+Lambda analysis orchestrator가 간단 adapter만 쓰지 않고 ai-agent 분석 모듈을 호출하도록 수정했다.
+ai-agent analyzer가 Prometheus alert, Athena signal, runbook을 보고 원인 후보와 recommendedAction을 만든다.
+Slack 2차 알림 payload에 cause candidates, recommended action, approval 필요 여부가 들어가도록 연결했다.
+Lambda zip에 ai_agent 모듈과 scripts/runbooks를 포함하도록 패키징 스크립트를 수정했다.
+```
+
+수정 파일:
+
+```text
+lambda/analysis-orchestrator/ai_agent_adapter.py
+lambda/analysis-orchestrator/app.py
+scripts/lambda/package-analysis-orchestrator.sh
+README.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+work-log.md
+```
+
+검증:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh 실행 성공
+zip 안에 ai_agent/analyzer.py, ai_agent/runbook_loader.py, ai_agent/slack_message_builder.py 포함 확인
+zip 안에 scripts/runbooks/*.sh 포함 확인
+scripts/test-local.sh 통과
+slack-second-alert.json에 원인 후보와 rollback 권장 조치 포함 확인
+```
+
+### 2026-06-11 15:52 - 승인 이벤트 workflow 추가
+
+작업:
+
+```text
+rollback, DR, manual fix, change 승인 내용을 EventBridge에 남기는 workflow를 추가했다.
+현재 단계는 승인 audit/event 발행까지이며, 실제 GitOps rollback 또는 DR 전환 실행기는 아직 연결하지 않는다.
+approved-action.yml workflow_dispatch로 운영자가 승인 정보를 입력할 수 있게 했다.
+DeploymentActionApproved 이벤트 스키마와 발행 스크립트를 추가했다.
+로컬 테스트에 승인 이벤트 dry-run 생성을 포함했다.
+```
+
+추가 파일:
+
+```text
+.github/workflows/approved-action.yml
+scripts/quality-gate/publish-approved-action-event.sh
+schemas/eventbridge/deployment-action-approved.schema.json
+```
+
+수정 파일:
+
+```text
+.gitignore
+README.md
+docs/20-implementation/08-events-and-slack-messages.md
+docs/20-implementation/25-rollback-workflow-design.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+scripts/test-local.sh
+work-log.md
+```
+
+주의:
+
+```text
+Slack에서 rollback 또는 DR을 승인해도 아직 실제 rollback/DR 조치는 실행되지 않는다.
+현재는 승인 이벤트를 EventBridge에 발행하고 artifact로 남기는 단계다.
+실제 조치는 별도 executor workflow 또는 기존 gympt-ops 운영 흐름과 연결해야 한다.
+```
+
+### 2026-06-11 16:10 - Slack 승인 후 자동 action dispatch 구조 추가
+
+작업:
+
+```text
+Slack 2차 알림에 Approve 버튼을 추가했다.
+Slack interactivity 요청을 받는 slack-approval-handler Lambda를 추가했다.
+승인 이벤트를 받으면 action type별 GitHub workflow를 자동 dispatch하는 deployment-action-executor Lambda를 추가했다.
+API Gateway POST /slack/interactions를 Terraform에 추가했다.
+DeploymentActionApproved EventBridge rule과 executor target을 Terraform에 추가했다.
+패키징 스크립트가 analysis-orchestrator, slack-approval-handler, deployment-action-executor zip을 모두 생성하도록 수정했다.
+```
+
+추가 파일:
+
+```text
+lambda/slack-approval-handler/app.py
+lambda/deployment-action-executor/app.py
+infra/terraform/apigateway.tf
+```
+
+수정 파일:
+
+```text
+ai-agent/app/analyzer.py
+ai-agent/app/slack_message_builder.py
+infra/terraform/eventbridge.tf
+infra/terraform/iam.tf
+infra/terraform/lambda.tf
+infra/terraform/outputs.tf
+infra/terraform/variables.tf
+scripts/lambda/package-analysis-orchestrator.sh
+scripts/test-local.sh
+README.md
+docs/20-implementation/25-rollback-workflow-design.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+work-log.md
+```
+
+검증:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh 실행 성공
+build/analysis-orchestrator.zip, build/slack-approval-handler.zip, build/deployment-action-executor.zip 생성 확인
+scripts/test-local.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+Slack 2차 알림 payload에 Approve rollback 버튼 포함 확인
+```
+
+### 2026-06-11 16:03 - 1차 Slack 알림 링크 보강
+
+작업:
+
+```text
+CD Quality Gate 실패 1차 Slack 알림에 Grafana 링크만 있던 상태를 보강했다.
+Prometheus alerts 링크와 Argo CD Application 링크를 grafana-links.json에 함께 생성한다.
+send-slack-first-alert.py가 Grafana, Prometheus, Argo CD, GitHub Actions run 링크를 모두 메시지에 넣도록 수정했다.
+```
+
+수정 파일:
+
+```text
+.github/workflows/quality-gate.yml
+scripts/quality-gate/build-grafana-links.py
+scripts/quality-gate/send-slack-first-alert.py
+scripts/test-local.sh
+docs/20-implementation/08-events-and-slack-messages.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+work-log.md
+```
+
+검증:
+
+```text
+scripts/test-local.sh 통과
+slack-first-alert.json에 Grafana, Prometheus Alerts, Argo CD 링크 포함 확인
+GitHub Actions 링크는 실제 workflow 실행 시 GITHUB_RUN_URL 환경값으로 포함됨
+```

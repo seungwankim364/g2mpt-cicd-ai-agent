@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -11,6 +12,9 @@ def main() -> int:
     parser.add_argument("--dashboard-uid", required=True)
     parser.add_argument("--service", required=True)
     parser.add_argument("--namespace", required=True)
+    parser.add_argument("--prometheus-url", default=os.environ.get("PROMETHEUS_URL", ""))
+    parser.add_argument("--argocd-url", default=os.environ.get("ARGOCD_URL", ""))
+    parser.add_argument("--argocd-app", default=os.environ.get("ARGOCD_APP", ""))
     parser.add_argument("--from-time", default="now-30m")
     parser.add_argument("--to-time", default="now")
     parser.add_argument("--output-file", default="grafana-links.json")
@@ -32,6 +36,13 @@ def main() -> int:
             "dashboard": dashboard_url,
         },
     }
+    if args.prometheus_url:
+        links["prometheus"] = {
+            "alerts": f"{args.prometheus_url.rstrip('/')}/alerts",
+        }
+    if args.argocd_url:
+        app_path = f"/applications/{args.argocd_app}" if args.argocd_app else ""
+        links["argocd"] = f"{args.argocd_url.rstrip('/')}{app_path}"
 
     with Path(args.output_file).open("w", encoding="utf-8") as file:
         json.dump(links, file, indent=2)
@@ -43,4 +54,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

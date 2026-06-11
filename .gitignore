@@ -6,5 +6,7 @@ quality-gate-result.json
 grafana-links.json
 slack-first-alert.json
 slack-deploy-success.json
+deployment-action-approved-event.json
 
 .aws-stop-state/
+build/

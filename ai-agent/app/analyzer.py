@@ -48,6 +48,10 @@ def analyze(payload: dict) -> dict:
     summary = f"{service} deployment failure analyzed with {len(alerts)} alert(s)."
     return {
         "deploymentId": deployment_id,
+        "service": service,
+        "environment": deployment.get("environment", payload.get("environment", "prod")),
+        "currentImageTag": deployment.get("imageTag", payload.get("imageTag", "unknown")),
+        "rollbackImageTag": deployment.get("rollbackImageTag", payload.get("rollbackImageTag", "")),
         "summary": summary,
         "severity": "critical" if action_type == "rollback" else "warning",
         "causeCandidates": candidates,

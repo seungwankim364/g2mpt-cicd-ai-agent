@@ -1,0 +1,79 @@
+import json
+import os
+import urllib.request
+
+try:
+    import boto3
+except ImportError:
+    boto3 = None
+
+
+GITHUB_API = "https://api.github.com"
+GITHUB_TOKEN_SECRET_ARN = os.environ.get("GITHUB_TOKEN_SECRET_ARN", "")
+
+WORKFLOW_REPOS = {
+    "rollback": os.environ.get("ROLLBACK_WORKFLOW_REPO", ""),
+    "dr": os.environ.get("DR_WORKFLOW_REPO", ""),
+    "manual_fix": os.environ.get("MANUAL_FIX_WORKFLOW_REPO", ""),
+    "change": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
+}
+
+WORKFLOW_FILES = {
+    "rollback": os.environ.get("ROLLBACK_WORKFLOW_FILE", "rollback.yml"),
+    "dr": os.environ.get("DR_WORKFLOW_FILE", "dr-failover.yml"),
+    "manual_fix": os.environ.get("MANUAL_FIX_WORKFLOW_FILE", "manual-fix.yml"),
+    "change": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),
+}
+
+
+def _secret_value(secret_arn):
+    if not secret_arn or boto3 is None:
+        return os.environ.get("GITHUB_TOKEN", "")
+    response = boto3.client("secretsmanager").get_secret_value(SecretId=secret_arn)
+    return response.get("SecretString", "")
+
+
+def _dispatch_workflow(repo, workflow_file, token, detail):
+    if not repo:
+        raise ValueError(f"No workflow repository configured for action {detail['actionType']}")
+    body = {
+        "ref": os.environ.get("WORKFLOW_REF", "main"),
+        "inputs": {
+            "deployment_id": detail["deploymentId"],
+            "service": detail["service"],
+            "environment": detail["environment"],
+            "action_type": detail["actionType"],
+            "approved_by": detail["approvedBy"],
+            "reason": detail.get("reason", ""),
+            "current_image_tag": detail.get("currentImageTag", "unknown"),
+            "target_image_tag": detail.get("targetImageTag", ""),
+        },
+    }
+    request = urllib.request.Request(
+        f"{GITHUB_API}/repos/{repo}/actions/workflows/{workflow_file}/dispatches",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
+        return {"status": "dispatched", "httpStatus": response.status}
+
+
+def handler(event, context):
+    detail = event.get("detail", event)
+    action_type = detail["actionType"]
+    token = _secret_value(GITHUB_TOKEN_SECRET_ARN)
+    if not token:
+        raise RuntimeError("GitHub token is required to dispatch approved action workflows")
+    result = _dispatch_workflow(
+        WORKFLOW_REPOS.get(action_type, ""),
+        WORKFLOW_FILES.get(action_type, ""),
+        token,
+        detail,
+    )
+    return {"statusCode": 200, "body": result}

@@ -78,7 +78,12 @@ Repository
 | `SLACK_CHANNEL` | `#cd-deploy-alarm` | `.github/workflows/quality-gate.yml` | webhook 채널과 일치해야 함 |
 | `GRAFANA_BASE_URL` | `https://grafana.g2mpt.com` | `.github/workflows/quality-gate.yml` step argument | dashboard link 생성 기준 |
 | `GRAFANA_DASHBOARD_UID` | `api-latency` | `.github/workflows/quality-gate.yml` step argument | backend-api main dashboard |
+| `ARGOCD_URL` | `https://argocd.g2mpt.com` | `.github/workflows/quality-gate.yml` | 1차 Slack 알림 Argo CD Application 링크 |
+| `ARGOCD_APP` | `backend-api-prod` | `.github/workflows/quality-gate.yml` | 1차 Slack 알림 대상 Application |
 | `GITOPS_REPO` | `hj-3/gympt-gitops` | 기존 gympt-ops app CI/CD | 이 저장소의 필수 runtime 값이 아님 |
+| `GITHUB_TOKEN_SECRET_ARN` | unset | Terraform variable `github_token_secret_arn` | 승인 후 대상 GitHub workflow 자동 dispatch용 token secret |
+| `ROLLBACK_WORKFLOW_REPO` | unset | Terraform variable `rollback_workflow_repo` | rollback 승인 시 dispatch할 repository |
+| `DR_WORKFLOW_REPO` | unset | Terraform variable `dr_workflow_repo` | DR 승인 시 dispatch할 repository |
 
 MVP에서는 코드에 고정된 값을 유지해도 된다. 여러 환경으로 확장할 때 GitHub Variables로 분리한다.
 

@@ -21,10 +21,24 @@ Rollback은 다음 경로로 시작된다.
 Slack 2차 알림
   -> Approve Rollback button
   -> Slack interaction endpoint
+  -> slack-approval-handler Lambda
+  -> DeploymentActionApproved EventBridge event
+  -> deployment-action-executor Lambda
   -> Rollback workflow dispatch
 ```
 
-MVP에서는 Slack button 대신 수동 `workflow_dispatch`로 대체할 수 있다.
+현재 구현된 자동 승인 흐름은 아래와 같다.
+
+```text
+Slack Approve button
+  -> API Gateway POST /slack/interactions
+  -> lambda/slack-approval-handler/app.py
+  -> DeploymentActionApproved EventBridge 이벤트 발행
+  -> lambda/deployment-action-executor/app.py
+  -> action type에 맞는 GitHub Actions workflow 자동 dispatch
+```
+
+수동 `approved-action.yml`은 장애 상황에서 Slack interactivity를 우회하기 위한 보조 경로로만 사용한다.
 
 ## 4. 입력 값
 
@@ -111,6 +125,21 @@ rollback.yml
   run-quality-gate
   notify-result
 ```
+
+현재 MVP workflow:
+
+```text
+slack-approval-handler
+  verify Slack signature
+  parse approved action
+  publish DeploymentActionApproved
+
+deployment-action-executor
+  read DeploymentActionApproved
+  dispatch rollback/dr/manual_fix/change workflow by action type
+```
+
+실제 rollback/DR 실행은 executor가 호출하는 대상 workflow에서 수행한다. 대상 workflow repository는 Terraform 변수 `rollback_workflow_repo`, `dr_workflow_repo`, `manual_fix_workflow_repo`, `change_workflow_repo`로 지정한다.
 
 ## 9. 실패 처리
 

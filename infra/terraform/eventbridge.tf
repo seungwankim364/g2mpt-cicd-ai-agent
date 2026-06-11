@@ -12,3 +12,13 @@ resource "aws_cloudwatch_event_rule" "deployment_failed" {
     "detail-type" = ["DeploymentFailed"]
   })
 }
+
+resource "aws_cloudwatch_event_rule" "deployment_action_approved" {
+  name           = "${local.name_prefix}-deployment-action-approved"
+  event_bus_name = aws_cloudwatch_event_bus.cd_quality_gate.name
+
+  event_pattern = jsonencode({
+    source        = ["cd.quality-gate"]
+    "detail-type" = ["DeploymentActionApproved"]
+  })
+}

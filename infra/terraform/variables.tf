@@ -33,3 +33,34 @@ variable "result_bucket_name" {
   type    = string
   default = null
 }
+
+variable "slack_signing_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "github_token_secret_arn" {
+  type    = string
+  default = ""
+}
+
+variable "rollback_workflow_repo" {
+  type    = string
+  default = ""
+}
+
+variable "dr_workflow_repo" {
+  type    = string
+  default = ""
+}
+
+variable "manual_fix_workflow_repo" {
+  type    = string
+  default = ""
+}
+
+variable "change_workflow_repo" {
+  type    = string
+  default = ""
+}

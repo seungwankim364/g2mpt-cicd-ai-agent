@@ -15,6 +15,8 @@ echo "[2/8] Python compile"
 python3 -m py_compile \
   scripts/quality-gate/*.py \
   lambda/analysis-orchestrator/*.py \
+  lambda/slack-approval-handler/*.py \
+  lambda/deployment-action-executor/*.py \
   ai-agent/app/*.py
 
 echo "[3/8] JSON fixtures and schemas"
@@ -59,6 +61,9 @@ scripts/quality-gate/build-grafana-links.py \
   --dashboard-uid "api-latency" \
   --service backend-api \
   --namespace gympt-prod \
+  --prometheus-url "http://kube-prometheus-stack-prometheus.monitoring.svc:9090" \
+  --argocd-url "https://argocd.g2mpt.com" \
+  --argocd-app "backend-api-prod" \
   --output-file "$TMP_DIR/grafana-links.json"
 
 SLACK_CHANNEL="#cd-deploy-alarm" scripts/quality-gate/send-slack-first-alert.py \
@@ -83,6 +88,18 @@ GRAFANA_LINKS_FILE="$TMP_DIR/grafana-links.json" \
 OUTPUT_FILE="$TMP_DIR/deployment-failed-event.json" \
 scripts/quality-gate/publish-eventbridge-event.sh
 
+DRY_RUN=true \
+ACTION_TYPE=rollback \
+DEPLOYMENT_ID=deploy-20260609-001 \
+SERVICE_NAME=backend-api \
+ENVIRONMENT=prod \
+CURRENT_IMAGE_TAG=backend-api:failed \
+TARGET_IMAGE_TAG=backend-api:stable \
+APPROVED_BY=local-test \
+REASON="fixture approval" \
+OUTPUT_FILE="$TMP_DIR/deployment-action-approved-event.json" \
+scripts/quality-gate/publish-approved-action-event.sh
+
 echo "[7/8] AI Agent and Lambda local execution"
 PYTHONPATH=ai-agent python3 -m app.main \
   --input-file tests/fixtures/athena-summary.sample.json \
@@ -95,4 +112,3 @@ echo "[8/8] AWS stop script help"
 scripts/aws/stop-after-work.sh --help >/dev/null
 
 echo "Local test passed. Artifacts: $TMP_DIR"
-

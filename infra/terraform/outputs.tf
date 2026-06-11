@@ -29,3 +29,7 @@ output "athena_database_name" {
 output "athena_workgroup_name" {
   value = aws_athena_workgroup.cd_quality_gate.name
 }
+
+output "slack_interactivity_url" {
+  value = "${aws_apigatewayv2_api.slack_approval.api_endpoint}/slack/interactions"
+}

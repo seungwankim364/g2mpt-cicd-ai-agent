@@ -65,6 +65,22 @@ EventBridge DeploymentFailed 이벤트를 발행했고,
 Athena + AI 분석 파이프라인을 시작했습니다.
 ```
 
+현재 1차 Slack 알림 payload는 아래 링크를 포함한다.
+
+```text
+Grafana dashboard URL
+Prometheus alerts URL
+Argo CD application URL
+GitHub Actions run URL
+```
+
+주의:
+
+```text
+Prometheus URL이 EKS 내부 service 주소이면 Slack에서 클릭한 사용자가 직접 열 수 없을 수 있다.
+이 경우 Grafana 링크를 1차 확인 링크로 사용하고, Prometheus 링크는 self-hosted runner 또는 cluster 내부 확인용으로 본다.
+```
+
 ## 3. 2차 Slack 알림: AI 분석 결과
 
 ```text
@@ -107,6 +123,48 @@ Links:
 
 ## 4. Athena Query 예시
 
+## 4. 승인 이벤트: rollback / DR / manual fix / change
+
+AI Agent가 추천한 조치를 운영자가 승인하면 승인 이벤트를 EventBridge에 발행한다.
+
+이 이벤트는 승인 audit trail이며, 실제 rollback GitOps 변경이나 DR 전환 실행기는 다음 단계에서 이 이벤트를 소비하도록 연결한다.
+
+```json
+{
+  "source": "cd.quality-gate",
+  "detail-type": "DeploymentActionApproved",
+  "detail": {
+    "deploymentId": "backend-api-prod-2026-06-11T06:00:00Z",
+    "service": "backend-api",
+    "environment": "prod",
+    "actionType": "rollback",
+    "approvedBy": "seungwankim364",
+    "approvedAt": "2026-06-11T06:05:00Z",
+    "reason": "BackendHighErrorRate and DB pool exhaustion after deployment",
+    "currentImageTag": "backend-api:abc1234",
+    "targetImageTag": "backend-api:def5678",
+    "status": "approved"
+  }
+}
+```
+
+현재 MVP 실행 경로:
+
+```text
+GitHub Actions approved-action.yml workflow_dispatch
+  -> scripts/quality-gate/publish-approved-action-event.sh
+  -> EventBridge cd-quality-gate-prod-bus
+  -> DeploymentActionApproved event 저장/전달
+```
+
+아직 하지 않는 것:
+
+```text
+승인 즉시 GitOps values 변경
+승인 즉시 Argo CD rollback
+승인 즉시 DR 전환
+```
+
 ```sql
 SELECT
   request_uri,
@@ -132,4 +190,3 @@ deployment-failures/
     athena-summary.json
     ai-recommendation.json
 ```
-

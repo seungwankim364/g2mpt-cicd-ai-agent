@@ -56,6 +56,8 @@ jobs:
       AWS_REGION: ap-northeast-2
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       SLACK_CHANNEL: "#cd-deploy-alarm"
+      ARGOCD_URL: https://argocd.g2mpt.com
+      ARGOCD_APP: backend-api-prod
       GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:
@@ -103,6 +105,9 @@ jobs:
             --dashboard-uid "api-latency" \
             --service "$SERVICE_NAME" \
             --namespace "$NAMESPACE" \
+            --prometheus-url "$PROMETHEUS_URL" \
+            --argocd-url "$ARGOCD_URL" \
+            --argocd-app "$ARGOCD_APP" \
             --output-file grafana-links.json
 
       - name: Send Slack first alert

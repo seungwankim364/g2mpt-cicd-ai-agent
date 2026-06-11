@@ -1,0 +1,78 @@
+name: Approved Deployment Action
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_type:
+        description: Approved action type
+        required: true
+        type: choice
+        options:
+          - rollback
+          - dr
+          - manual_fix
+          - change
+      deployment_id:
+        description: Deployment id from AI analysis
+        required: true
+      service:
+        description: Service name
+        required: true
+        default: backend-api
+      environment:
+        description: Deployment environment
+        required: true
+        default: prod
+      current_image_tag:
+        description: Current failed image tag
+        required: false
+        default: unknown
+      target_image_tag:
+        description: Rollback target image tag, if action_type is rollback
+        required: false
+      approved_by:
+        description: Operator who approved the action
+        required: true
+      reason:
+        description: Approval reason
+        required: true
+
+jobs:
+  publish-approved-action:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      ACTION_TYPE: ${{ inputs.action_type }}
+      DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+      SERVICE_NAME: ${{ inputs.service }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      CURRENT_IMAGE_TAG: ${{ inputs.current_image_tag }}
+      TARGET_IMAGE_TAG: ${{ inputs.target_image_tag }}
+      APPROVED_BY: ${{ inputs.approved_by }}
+      REASON: ${{ inputs.reason }}
+      EVENT_BUS_NAME: cd-quality-gate-prod-bus
+      AWS_REGION: ap-northeast-2
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        if: env.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish approved action event
+        run: scripts/quality-gate/publish-approved-action-event.sh
+
+      - name: Upload approved action event
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-action-approved-event
+          path: deployment-action-approved-event.json

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeploymentActionApprovedEvent",
+  "type": "object",
+  "required": ["source", "detail-type", "detail"],
+  "properties": {
+    "source": {
+      "const": "cd.quality-gate"
+    },
+    "detail-type": {
+      "const": "DeploymentActionApproved"
+    },
+    "time": {
+      "type": "string"
+    },
+    "detail": {
+      "type": "object",
+      "required": ["deploymentId", "service", "environment", "actionType", "approvedBy", "approvedAt", "status"],
+      "properties": {
+        "deploymentId": { "type": "string" },
+        "service": { "type": "string" },
+        "environment": { "type": "string", "enum": ["dev", "staging", "prod"] },
+        "actionType": { "type": "string", "enum": ["rollback", "dr", "manual_fix", "change"] },
+        "approvedBy": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "reason": { "type": "string" },
+        "currentImageTag": { "type": "string" },
+        "targetImageTag": { "type": "string" },
+        "status": { "const": "approved" }
+      }
+    }
+  }
+}
