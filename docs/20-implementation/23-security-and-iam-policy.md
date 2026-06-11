@@ -23,7 +23,7 @@ GitHub Actions는 배포와 Quality Gate 실행에 필요한 권한만 가진다
 ```text
 ECR image push
 GitOps repository update
-Argo CD sync/wait
+Kubernetes rollout read
 Prometheus API read
 EventBridge PutEvents
 Slack webhook send
@@ -179,4 +179,3 @@ S3 bucket public access 차단 확인
 Athena query result bucket 암호화 확인
 AI Agent 입력에 민감 정보가 없는지 fixture로 검증
 ```
-

@@ -15,9 +15,10 @@
 Developer 또는 운영자
   -> .github/workflows/cd.yml 실행
   -> scripts/cd/update-gitops-image-tag.sh
-  -> scripts/cd/wait-argocd-app.sh
-  -> scripts/cd/check-k8s-rollout.sh
+  -> hj-3/gympt-gitops main branch values-prod.yaml image tag push
+  -> Argo CD backend-api-prod automated sync
   -> .github/workflows/quality-gate.yml 호출
+  -> scripts/cd/check-k8s-rollout.sh
   -> scripts/quality-gate/query-prometheus-alerts.sh
   -> scripts/quality-gate/query-prometheus-metrics.sh
   -> scripts/quality-gate/evaluate-quality-gate.py
@@ -38,10 +39,10 @@ Developer 또는 운영자
 
 | draw.io 영역 | 실제 파일 | 역할 |
 | --- | --- | --- |
-| GitHub Actions CD | `.github/workflows/cd.yml` | CD 시작점. image tag 입력을 받고 GitOps 수정, Argo CD sync/wait, rollout 확인 후 Quality Gate workflow 호출 |
+| GitHub Actions CD | `.github/workflows/cd.yml` | CD 시작점. image tag 입력을 받고 GitOps 수정 후 Quality Gate workflow 호출 |
 | GitOps image tag update | `scripts/cd/update-gitops-image-tag.sh` | `GITOPS_REPO`를 clone하고 `VALUES_FILE`의 `tag:` 값을 `IMAGE_TAG`로 변경 |
-| Argo CD sync/wait | `scripts/cd/wait-argocd-app.sh` | `ARGOCD_APP=backend-api-prod`를 sync하고 health/sync 상태가 정상인지 대기 |
-| Kubernetes rollout | `scripts/cd/check-k8s-rollout.sh` | `K8S_NAMESPACE=gympt-prod`, `K8S_DEPLOYMENT=backend-api-prod` rollout 상태 확인 |
+| Argo CD automated sync | `argocd/applications/prod/backend-api.yaml` in `gympt-ops` | GitOps 변경을 감지해 `backend-api-prod`를 자동 sync |
+| Kubernetes rollout | `scripts/cd/check-k8s-rollout.sh` | self-hosted runner에서 `K8S_NAMESPACE=gympt-prod`, `K8S_DEPLOYMENT=backend-api-prod` rollout 상태 확인 |
 | Quality Gate | `.github/workflows/quality-gate.yml` | Prometheus 조회, gate 판단, Slack 알림, EventBridge 발행을 순서대로 실행 |
 | Prometheus alerts | `scripts/quality-gate/query-prometheus-alerts.sh` | Prometheus API에서 현재 alert 목록을 조회하거나 fixture로 대체 |
 | Prometheus metrics | `scripts/quality-gate/query-prometheus-metrics.sh` | 배포 직후 판단에 필요한 metric snapshot을 조회 |
@@ -198,7 +199,7 @@ image repository=337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/ba
 역할:
 
 ```text
-Argo CD application을 sync하고 health/sync 완료까지 기다린다.
+Argo CD application을 수동으로 sync하고 health/sync 완료까지 기다리는 선택 도구다.
 ```
 
 읽는 값:
@@ -217,7 +218,9 @@ ARGOCD_TIMEOUT=300
 4. argocd app get backend-api-prod
 ```
 
-아키텍처 흐름도에서는 `Argo CD`가 GitOps 변경을 보고 EKS에 배포하는 구간이다.
+기본 CD 경로에서는 사용하지 않는다. `gympt-ops` 방식은 GitOps push 후 Argo CD `syncPolicy.automated`에 맡긴다.
+
+아키텍처 흐름도에서는 수동 운영/장애 대응 보조 도구로만 표현한다.
 
 ### `scripts/cd/check-k8s-rollout.sh`
 
@@ -699,7 +702,7 @@ scripts/test-local.sh
 ```text
 GitHub Actions CD
   -> GitOps values-prod.yaml image tag update
-  -> Argo CD backend-api-prod sync
+  -> Argo CD backend-api-prod automated sync
   -> Amazon EKS gympt-prod/backend-api-prod rollout
   -> Quality Gate
   -> Prometheus alert/metric check

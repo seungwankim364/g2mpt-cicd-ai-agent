@@ -17,3 +17,4 @@
 | DOC-26 | [Operations Runbook](24-operations-runbook.md) | 운영자 장애 대응 절차 |
 | DOC-27 | [Rollback Workflow Design](25-rollback-workflow-design.md) | 승인 기반 rollback workflow 설계 |
 | DOC-31 | [Runtime File Role and Architecture Flow](26-runtime-file-role-and-architecture-flow.md) | yml/sh/py 파일별 역할과 실제 아키텍처 실행 흐름 |
+| DOC-32 | [GitHub Secrets and Runtime Values](27-github-secrets-and-runtime-values.md) | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 정리 |

@@ -160,9 +160,9 @@ quality-gate workflow 호출
 3. docker build
 4. docker push
 5. update GitOps image tag
-6. argocd app sync/wait
-7. kubectl rollout status
-8. run post-deploy quality gate
+6. Argo CD automated sync가 Git 변경을 감지
+7. run post-deploy quality gate
+8. self-hosted runner에서 kubectl rollout status
 ```
 
 ### `.github/workflows/quality-gate.yml`
@@ -203,7 +203,9 @@ GitOps commit SHA
 
 ### `scripts/cd/wait-argocd-app.sh`
 
-Argo CD application sync와 health 상태를 대기한다.
+Argo CD application sync와 health 상태를 대기하는 선택 도구다.
+
+기본 운영 흐름은 `gympt-ops`와 동일하게 GitOps repository에 image tag를 push하고 Argo CD `syncPolicy.automated`가 자동 배포하도록 둔다. 따라서 `cd.yml` 기본 경로에서는 이 script를 호출하지 않는다.
 
 사용 명령:
 
@@ -734,4 +736,3 @@ scripts/
     backend-high-latency.sh
     pod-restarting.sh
 ```
-

@@ -812,7 +812,77 @@ work-log.md
 검증:
 
 ```text
+GitHub Actions YAML 파싱 통과
+scripts/cd/*.sh shell syntax 통과
+scripts/test-local.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+```
+
+### 2026-06-11 00:00 - gympt-ops 방식에 맞춘 GitOps/Prometheus/Argo CD 결정 반영
+
+작업:
+
+```text
+gympt-ops를 read-only로 확인해 배포 방식을 재정리했다.
+gympt-app CI는 GITOPS_PAT로 hj-3/gympt-gitops main branch의 values-prod.yaml image tag를 직접 commit/push한다.
+backend-api-prod Argo CD Application은 syncPolicy.automated로 Git 변경을 감지해 자동 배포한다.
+Prometheus는 외부 공개 URL이 아니라 EKS 내부 kube-prometheus-stack service를 사용한다.
+Quality Gate는 EKS/VPC 내부 self-hosted runner에서 실행하도록 맞췄다.
+```
+
+확정:
+
+```text
+GITOPS_REPO=hj-3/gympt-gitops
+GitOps auth secret=GITOPS_PAT
+PROMETHEUS_URL=http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+Quality Gate runner=[self-hosted, linux, eks]
+Argo CD sync 방식=GitOps push 후 automated sync
+```
+
+수정 파일:
+
+```text
+.github/workflows/cd.yml
+.github/workflows/quality-gate.yml
+scripts/cd/update-gitops-image-tag.sh
+docs/20-implementation/14-implementation-file-architecture.md
+docs/20-implementation/15-github-actions-workflow-design.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+work-log.md
+```
+
+검증:
+
+```text
 Runtime File Role 문서 참조 확인
 scripts/test-local.sh 통과
 terraform -chdir=infra/terraform fmt -check 통과
+```
+
+### 2026-06-11 00:00 - GitHub Secrets와 runtime 값 정리 문서 추가
+
+작업:
+
+```text
+실제 값 주입 전에 필요한 GitHub Secrets, GitHub Variables, AWS Secrets Manager 항목을 정리했다.
+secret 원문은 문서에 기록하지 않고 입력 위치와 확인 방법만 기록하는 기준으로 작성했다.
+GITOPS_PAT, PROMETHEUS_URL, SLACK_WEBHOOK_URL, AWS_ROLE_ARN을 우선 입력 대상으로 정리했다.
+Prometheus 접근 방식, GitOps 인증 방식, Argo CD sync 방식은 gympt-ops 기준으로 확정했다.
+```
+
+추가 파일:
+
+```text
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+```
+
+수정 파일:
+
+```text
+docs/20-implementation/README.md
+docs/README.md
+README.md
+work-log.md
 ```

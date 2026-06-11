@@ -17,7 +17,7 @@
 
 | Workflow | 역할 |
 | --- | --- |
-| `cd.yml` | build, push, GitOps image tag update, Argo CD sync/wait, rollout 확인 |
+| `cd.yml` | GitOps image tag update, Argo CD automated sync 트리거 |
 | `quality-gate.yml` | Prometheus alert/metric 조회, quality gate 판단, Slack 알림, EventBridge 이벤트 발행 |
 
 ## 3. 전체 실행 순서
@@ -27,8 +27,8 @@
 2. Docker image build
 3. ECR push
 4. GitOps Repository image tag 수정
-5. Argo CD sync/wait
-6. Kubernetes rollout status 확인
+5. Argo CD automated sync가 Git 변경 감지
+6. self-hosted runner에서 Kubernetes rollout status 확인
 7. Prometheus alert 조회
 8. Prometheus metric 조회
 9. Quality Gate 평가
@@ -55,16 +55,20 @@ on:
 
 ```text
 AWS_ROLE_ARN
-AWS_REGION
-ECR_REGISTRY
-GITOPS_DEPLOY_KEY
-ARGOCD_SERVER
-ARGOCD_AUTH_TOKEN
+GITOPS_PAT
 SLACK_WEBHOOK_URL
-PROMETHEUS_BASE_URL
-GRAFANA_BASE_URL
-EVENT_BUS_NAME
+PROMETHEUS_URL
 ```
+
+`gympt-ops`와 동일하게 GitHub Actions는 `GITOPS_PAT`로 `hj-3/gympt-gitops` main branch의 values file을 직접 갱신한다. Argo CD 직접 sync용 `ARGOCD_SERVER`, `ARGOCD_AUTH_TOKEN`은 기본 CD 경로에서 사용하지 않는다.
+
+`PROMETHEUS_URL`은 EKS 내부 kube-prometheus-stack service를 사용한다.
+
+```text
+http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+```
+
+따라서 Quality Gate workflow는 EKS/VPC 내부 self-hosted runner에서 실행한다.
 
 ### Required Inputs / Env
 
@@ -73,7 +77,6 @@ SERVICE_NAME
 ENVIRONMENT
 IMAGE_TAG
 COMMIT_SHA
-ARGOCD_APP
 K8S_NAMESPACE
 K8S_DEPLOYMENT
 ```
@@ -237,4 +240,3 @@ Slack 알림 실패 때문에 EventBridge 발행이 누락되지 않게 한다.
 EventBridge payload에는 commit, image tag, alert 목록을 반드시 넣는다.
 민감 정보는 Slack 메시지나 EventBridge detail에 포함하지 않는다.
 ```
-

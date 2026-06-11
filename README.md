@@ -209,6 +209,7 @@ scripts/aws/stop-after-work.sh --execute
 | DOC-23 | [Security and IAM Policy](docs/20-implementation/23-security-and-iam-policy.md) | 권한, secret, 보안 기준 |
 | DOC-26 | [Operations Runbook](docs/20-implementation/24-operations-runbook.md) | 운영자 장애 대응 절차 |
 | DOC-27 | [Rollback Workflow Design](docs/20-implementation/25-rollback-workflow-design.md) | 승인 기반 rollback workflow 설계 |
+| DOC-32 | [GitHub Secrets and Runtime Values](docs/20-implementation/27-github-secrets-and-runtime-values.md) | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 정리 |
 
 ### 30. Presentation
 

@@ -269,20 +269,20 @@ labels.environment == ENVIRONMENT
 ### Alerts
 
 ```bash
-curl -s "$PROMETHEUS_BASE_URL/api/v1/alerts"
+curl -s "$PROMETHEUS_URL/api/v1/alerts"
 ```
 
 ### Instant Query
 
 ```bash
-curl -G "$PROMETHEUS_BASE_URL/api/v1/query" \
+curl -G "$PROMETHEUS_URL/api/v1/query" \
   --data-urlencode 'query=sum(rate(http_requests_total{service="backend-api",status=~"5.."}[5m]))'
 ```
 
 ### Range Query
 
 ```bash
-curl -G "$PROMETHEUS_BASE_URL/api/v1/query_range" \
+curl -G "$PROMETHEUS_URL/api/v1/query_range" \
   --data-urlencode 'query=histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="backend-api"}[5m])) by (le))' \
   --data-urlencode 'start=2026-06-08T15:10:00+09:00' \
   --data-urlencode 'end=2026-06-08T15:20:00+09:00' \
@@ -302,4 +302,3 @@ BackendDBConnectionError
 ```
 
 이후 서비스별로 SQS, Redis, GPU, WAF, CloudFront 지표를 확장한다.
-

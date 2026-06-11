@@ -19,16 +19,16 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     env:
       SERVICE_NAME: ${{ inputs.service }}
       ENVIRONMENT: ${{ inputs.environment }}
       IMAGE_TAG: ${{ inputs.image_tag }}
-      GITOPS_REPO: ${{ secrets.GITOPS_REPO }}
+      GITOPS_REPO: hj-3/gympt-gitops
+      GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
       VALUES_FILE: charts/backend-api/values-prod.yaml
-      ARGOCD_APP: backend-api-prod
-      K8S_DEPLOYMENT: backend-api-prod
-      K8S_NAMESPACE: gympt-prod
 
     steps:
       - name: Checkout
@@ -36,12 +36,6 @@ jobs:
 
       - name: Update GitOps image tag
         run: scripts/cd/update-gitops-image-tag.sh
-
-      - name: Wait Argo CD application
-        run: scripts/cd/wait-argocd-app.sh
-
-      - name: Check Kubernetes rollout
-        run: scripts/cd/check-k8s-rollout.sh
 
   quality-gate:
     needs: deploy

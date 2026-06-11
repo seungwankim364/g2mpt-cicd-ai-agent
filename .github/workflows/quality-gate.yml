@@ -38,7 +38,10 @@ on:
 
 jobs:
   quality-gate:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, eks]
+    permissions:
+      contents: read
+      id-token: write
 
     env:
       SERVICE_NAME: ${{ inputs.service }}
@@ -48,6 +51,7 @@ jobs:
       IMAGE_TAG: ${{ inputs.image_tag }}
       ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
       PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       EVENT_BUS_NAME: cd-quality-gate-prod-bus
       AWS_REGION: ap-northeast-2
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -57,6 +61,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        if: env.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check Kubernetes rollout
+        env:
+          K8S_NAMESPACE: ${{ inputs.namespace }}
+          K8S_DEPLOYMENT: ${{ inputs.deployment }}
+        run: scripts/cd/check-k8s-rollout.sh
 
       - name: Query Prometheus alerts
         env:
