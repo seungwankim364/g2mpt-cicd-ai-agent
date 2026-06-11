@@ -3,20 +3,19 @@
 ## 1. 정상 배포 흐름
 
 ```text
-1. 개발자가 main 또는 dev 브랜치에 코드를 push한다.
-2. GitHub Actions가 Docker Image를 빌드한다.
-3. Image를 ECR에 push한다.
-4. GitHub Actions가 `GITOPS_PAT`로 `hj-3/gympt-gitops` main branch를 checkout한다.
-5. `charts/backend-api/values-prod.yaml`의 `.image.tag`를 새 tag로 수정한다.
-6. GitOps 변경 commit을 main branch에 직접 push한다.
-7. Argo CD `backend-api-prod` Application이 Git 변경을 감지한다.
-8. Argo CD automated sync가 EKS `gympt-prod/backend-api-prod`에 배포한다.
-9. Quality Gate workflow가 EKS/VPC 내부 self-hosted runner에서 실행된다.
-10. Kubernetes rollout status를 확인한다.
-11. 내부 Prometheus API를 호출하여 관련 alert 상태를 확인한다.
-12. backend-api 대상 서비스의 메트릭을 확인한다.
-13. 문제가 없으면 CD job을 성공 처리한다.
-14. Slack `#cicd-deploy-alarm`으로 배포 완료 메시지를 보낸다.
+1. 개발자가 기존 `gympt-ops` app repository에 코드를 push하거나 prod 배포 PR을 승인한다.
+2. 기존 GitHub Actions가 build/test를 수행한다.
+3. 기존 GitHub Actions가 Docker image를 생성하고 ECR에 push한다.
+4. 기존 GitHub Actions가 GitOps repository의 `values-dev.yaml` 또는 `values-prod.yaml` image tag를 갱신한다.
+5. Argo CD가 GitOps repository 변경을 감지한다.
+6. Argo CD automated sync가 EKS `gympt-prod/backend-api-prod`에 배포한다.
+7. 여기서부터 이 저장소의 CD Quality Gate 확장 흐름이 시작된다.
+8. Quality Gate workflow가 EKS/VPC 내부 self-hosted runner에서 실행된다.
+9. Kubernetes rollout status를 확인한다.
+10. 내부 Prometheus API를 호출하여 관련 alert 상태를 확인한다.
+11. backend-api 대상 서비스의 메트릭을 확인한다.
+12. 문제가 없으면 Quality Gate를 성공 처리한다.
+13. Slack `#cd-deploy-alarm`으로 배포 완료 메시지를 보낸다.
 ```
 
 ## 2. 배포 실패 흐름

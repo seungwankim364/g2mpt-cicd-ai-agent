@@ -3,7 +3,7 @@ output "event_bus_name" {
 }
 
 output "slack_channel" {
-  value = "#cicd-deploy-alarm"
+  value = "#cd-deploy-alarm"
 }
 
 output "required_resource_tags" {

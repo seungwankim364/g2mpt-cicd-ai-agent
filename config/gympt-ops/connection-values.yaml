@@ -14,7 +14,7 @@ monitoring:
   prometheusInternalUrl: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
   grafanaBaseUrl: https://grafana.g2mpt.com
   slack:
-    cdQualityGateChannel: "#cicd-deploy-alarm"
+    cdQualityGateChannel: "#cd-deploy-alarm"
     secretNamespace: monitoring
     secretName: alertmanager-slack-webhook
     secretKey: url

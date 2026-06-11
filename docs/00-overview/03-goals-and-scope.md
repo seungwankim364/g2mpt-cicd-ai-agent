@@ -22,7 +22,7 @@
 ### MVP 1차
 
 ```text
-GitHub Actions CD 후 Prometheus alert 조회
+기존 gympt-ops 배포 완료 후 Prometheus alert 조회
 firing alert가 있으면 Slack 알림
 Grafana/Prometheus/Argo CD 링크 포함
 GitHub Actions job 실패 처리
@@ -79,4 +79,3 @@ Athena 결과가 S3에 저장된다.
 AI Agent가 분석 결과와 Runbook을 기반으로 대응 방안을 생성한다.
 Slack 2차 알림이 전송된다.
 ```
-

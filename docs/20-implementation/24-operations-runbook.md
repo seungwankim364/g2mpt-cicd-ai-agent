@@ -7,7 +7,7 @@ CD Quality Gate 실패 또는 AI Incident Analysis Pipeline 장애가 발생했�
 ## 2. 운영자가 보는 첫 신호
 
 ```text
-GitHub Actions CD job failed
+Post-deploy Quality Gate job failed
 Slack 1차 알림 수신
 Slack 2차 AI 분석 알림 수신
 Argo CD application degraded

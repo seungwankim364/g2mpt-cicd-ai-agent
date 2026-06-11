@@ -13,11 +13,13 @@
 
 ```text
 Developer 또는 운영자
-  -> .github/workflows/cd.yml 실행
-  -> scripts/cd/update-gitops-image-tag.sh
-  -> hj-3/gympt-gitops main branch values-prod.yaml image tag push
+  -> 기존 gympt-ops app CI/CD 실행
+  -> ECR image push
+  -> gympt-ops GitOps values-dev/prod.yaml image tag update
   -> Argo CD backend-api-prod automated sync
-  -> .github/workflows/quality-gate.yml 호출
+  -> EKS gympt-prod/backend-api-prod 배포 완료
+  -> 여기서부터 cd-quality-gate-architecture 확장 시작
+  -> .github/workflows/quality-gate.yml 실행 또는 기존 workflow에서 호출
   -> scripts/cd/check-k8s-rollout.sh
   -> scripts/quality-gate/query-prometheus-alerts.sh
   -> scripts/quality-gate/query-prometheus-metrics.sh
@@ -32,7 +34,7 @@ Developer 또는 운영자
   -> athena/queries/*.sql
   -> ai-agent/app/main.py 또는 ai-agent/app/analyzer.py
   -> ai-agent/app/slack_message_builder.py
-  -> Slack #cicd-deploy-alarm 2차 분석/승인 알림
+  -> Slack #cd-deploy-alarm 2차 분석/승인 알림
 ```
 
 ## 1.1 현재 확정된 runtime architecture tree
@@ -41,28 +43,16 @@ Developer 또는 운영자
 
 ```text
 cd-quality-gate-runtime
-  cd-start
-    actor: Developer 또는 운영자
-    entrypoint: .github/workflows/cd.yml
-    input:
-      service: backend-api
-      environment: prod
-      image_tag: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:<tag>
+  existing-gympt-ops-cicd
+    owner: gympt-ops
+    responsibility:
+      - build/test
+      - Docker image build
+      - ECR push
+      - GitOps values-dev/prod.yaml image tag update
+      - prod values 변경 PR 또는 승인 흐름
 
-  gitops-update
-    runner: GitHub-hosted runner 가능
-    script: scripts/cd/update-gitops-image-tag.sh
-    secret:
-      GITOPS_PAT
-    target:
-      repo: hj-3/gympt-gitops
-      branch: main
-      file: charts/backend-api/values-prod.yaml
-      field: .image.tag
-    output:
-      GitOps commit
-
-  argocd-automated-sync
+  existing-argocd-automated-sync
     owner: gympt-ops
     file: ../gympt-ops/gympt-gitops/argocd/applications/prod/backend-api.yaml
     app: backend-api-prod
@@ -78,8 +68,10 @@ cd-quality-gate-runtime
       syncPolicy.automated.prune: true
       syncPolicy.automated.selfHeal: true
 
-  quality-gate
+  quality-gate-extension
+    owner: cd-quality-gate-architecture
     entrypoint: .github/workflows/quality-gate.yml
+    wrapper: .github/workflows/cd.yml
     runner: [self-hosted, linux, eks]
     reason:
       - internal Kubernetes rollout 확인 필요
@@ -122,18 +114,19 @@ cd-quality-gate-runtime
       runbook-loader: ai-agent/app/runbook_loader.py
       slack-builder: ai-agent/app/slack_message_builder.py
     output:
-      slack-channel: #cicd-deploy-alarm
+      slack-channel: #cd-deploy-alarm
       message: rollback / DR / change approval recommendation
 ```
 
-중요한 점은 `argocd app sync`가 기본 CD 실행 파일이 아니라는 것이다. 현재 확정 구조에서는 GitOps commit이 desired state 변경이고, Argo CD는 그 변경을 자동으로 sync한다.
+중요한 점은 이 저장소가 기존 배포 앞단을 다시 만들지 않는다는 것이다. build, ECR push, GitOps values update, Argo CD automated sync는 이미 `gympt-ops`에 있다. 이 저장소는 그 이후의 post-deploy Quality Gate와 AI Incident Analysis만 추가한다.
 
 ## 2. draw.io 박스와 실제 파일 매핑
 
 | draw.io 영역 | 실제 파일 | 역할 |
 | --- | --- | --- |
-| GitHub Actions CD | `.github/workflows/cd.yml` | CD 시작점. image tag 입력을 받고 GitOps 수정 후 Quality Gate workflow 호출 |
-| GitOps image tag update | `scripts/cd/update-gitops-image-tag.sh` | `GITOPS_PAT`로 `hj-3/gympt-gitops`를 clone하고 `charts/backend-api/values-prod.yaml`의 `.image.tag`를 `IMAGE_TAG`로 변경 후 main에 push |
+| Existing app CI/CD | `gympt-ops` app workflows | build/test, ECR push, GitOps values image tag update |
+| Post-deploy wrapper | `.github/workflows/cd.yml` | 기존 배포 이후 수동 또는 연동 방식으로 Quality Gate workflow 호출 |
+| GitOps image tag update | existing `gympt-ops` app workflow | 이 저장소가 수행하지 않음. 기존 app CI/CD가 GitOps values-dev/prod.yaml을 갱신 |
 | Argo CD automated sync | `argocd/applications/prod/backend-api.yaml` in `gympt-ops` | GitOps 변경을 감지해 `backend-api-prod`를 자동 sync |
 | Kubernetes rollout | `scripts/cd/check-k8s-rollout.sh` | self-hosted runner에서 `K8S_NAMESPACE=gympt-prod`, `K8S_DEPLOYMENT=backend-api-prod` rollout 상태 확인 |
 | Quality Gate | `.github/workflows/quality-gate.yml` | Prometheus 조회, gate 판단, Slack 알림, EventBridge 발행을 순서대로 실행 |
@@ -141,7 +134,7 @@ cd-quality-gate-runtime
 | Prometheus metrics | `scripts/quality-gate/query-prometheus-metrics.sh` | 배포 직후 판단에 필요한 metric snapshot을 조회 |
 | Gate decision | `scripts/quality-gate/evaluate-quality-gate.py` | firing alert 중 서비스/namespace/alert name이 일치하는 항목이 있으면 실패 처리 |
 | Grafana links | `scripts/quality-gate/build-grafana-links.py` | Slack 메시지에 넣을 Grafana dashboard URL 생성 |
-| Slack 1차 실패 알림 | `scripts/quality-gate/send-slack-first-alert.py` | CD 실패 즉시 `#cicd-deploy-alarm`에 1차 알림 payload 생성/전송 |
+| Slack 1차 실패 알림 | `scripts/quality-gate/send-slack-first-alert.py` | CD 실패 즉시 `#cd-deploy-alarm`에 1차 알림 payload 생성/전송 |
 | Slack 배포 완료 알림 | `scripts/quality-gate/send-slack-deploy-success.py` | Quality Gate 통과 시 배포 완료 payload 생성/전송 |
 | EventBridge event | `scripts/quality-gate/publish-eventbridge-event.sh` | `DeploymentFailed` 이벤트를 만들고 `cd-quality-gate-prod-bus`로 발행 |
 | EventBridge bus/rule | `infra/terraform/eventbridge.tf` | 전용 bus와 `DeploymentFailed` rule 정의 |
@@ -158,12 +151,12 @@ cd-quality-gate-runtime
 
 ### `.github/workflows/cd.yml`
 
-이 파일은 CD 시작점이다.
+이 파일은 기존 배포 이후 Quality Gate를 수동 실행하거나, 나중에 기존 `gympt-ops` workflow에서 호출하기 위한 post-deploy wrapper다.
 
 실행 방식:
 
 ```text
-GitHub Actions -> workflow_dispatch -> CD workflow 실행
+GitHub Actions -> workflow_dispatch -> Post Deploy Quality Gate 실행
 ```
 
 주요 입력:
@@ -177,23 +170,19 @@ image_tag: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-
 주요 환경값:
 
 ```text
-VALUES_FILE=charts/backend-api/values-prod.yaml
-ARGOCD_APP=backend-api-prod
-K8S_DEPLOYMENT=backend-api-prod
-K8S_NAMESPACE=gympt-prod
+namespace: gympt-prod
+deployment: backend-api-prod
 ```
 
 흐름:
 
 ```text
 1. repository checkout
-2. scripts/cd/update-gitops-image-tag.sh 실행
-3. scripts/cd/wait-argocd-app.sh 실행
-4. scripts/cd/check-k8s-rollout.sh 실행
-5. .github/workflows/quality-gate.yml 재사용 workflow 호출
+2. .github/workflows/quality-gate.yml 재사용 workflow 호출
+3. quality-gate.yml 내부에서 rollout/Prometheus/Slack/EventBridge 처리
 ```
 
-아키텍처 흐름도에서는 `GitHub Actions CD` 박스와 `Argo CD` 박스 사이를 설명하는 시작 파일이다.
+아키텍처 흐름도에서는 기존 `gympt-ops` 배포 뒤에 붙는 `CD Quality Gate extension` 진입점이다.
 
 ### `.github/workflows/quality-gate.yml`
 
@@ -215,7 +204,7 @@ NAMESPACE=gympt-prod
 DEPLOYMENT=backend-api-prod
 ALERT_NAMES=BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
 EVENT_BUS_NAME=cd-quality-gate-prod-bus
-SLACK_CHANNEL=#cicd-deploy-alarm
+SLACK_CHANNEL=#cd-deploy-alarm
 ```
 
 흐름:
@@ -253,8 +242,10 @@ SLACK_CHANNEL=#cicd-deploy-alarm
 역할:
 
 ```text
-GitOps repository의 values file에서 image tag를 새 배포 tag로 변경하고 main branch에 push한다.
+GitOps repository의 values file에서 image tag를 새 배포 tag로 변경하고 main branch에 push하는 선택 보조 도구다.
 ```
+
+현재 기본 통합 흐름에서는 이 script를 사용하지 않는다. 기존 `gympt-ops` app CI/CD가 이미 ECR push와 GitOps values update를 담당한다.
 
 읽는 값:
 
@@ -289,7 +280,7 @@ target repository=hj-3/gympt-gitops
 target branch=main
 ```
 
-아키텍처 흐름도에서는 GitHub Actions가 GitOps repo에 desired state 변경을 넣는 화살표에 해당한다. 이 commit이 들어가면 Argo CD가 자동으로 sync한다.
+아키텍처 흐름도에서는 기존 `gympt-ops` app CI/CD가 GitOps repo에 desired state 변경을 넣는 화살표에 해당한다. 이 저장소의 script는 나중에 독립 실행/테스트/수동 운영이 필요할 때만 사용한다.
 
 ### Argo CD automated sync
 
@@ -500,7 +491,7 @@ grafana-links.json
 
 ```text
 SLACK_WEBHOOK_URL
-SLACK_CHANNEL=#cicd-deploy-alarm
+SLACK_CHANNEL=#cd-deploy-alarm
 GITHUB_RUN_URL
 ```
 
@@ -526,7 +517,7 @@ Quality Gate 통과 시 Slack 배포 완료 알림 payload를 만들거나 webho
 service=backend-api
 namespace=gympt-prod
 image-tag=<배포 image tag>
-SLACK_CHANNEL=#cicd-deploy-alarm
+SLACK_CHANNEL=#cd-deploy-alarm
 GITHUB_RUN_URL
 ```
 
@@ -825,22 +816,24 @@ scripts/test-local.sh
 ### 정상 배포 경로
 
 ```text
-GitHub Actions CD
-  -> GitOps values-prod.yaml image tag update
+Existing gympt-ops app CI/CD
+  -> build/test/ECR push
+  -> GitOps values-dev/prod.yaml image tag update
   -> Argo CD backend-api-prod automated sync
   -> Amazon EKS gympt-prod/backend-api-prod rollout
+  -> cd-quality-gate-architecture extension starts
   -> Quality Gate
   -> Prometheus alert/metric check
   -> Quality Gate passed
-  -> Slack #cicd-deploy-alarm deploy complete
+  -> Slack #cd-deploy-alarm deploy complete
 ```
 
 관련 파일:
 
 ```text
-.github/workflows/cd.yml
-scripts/cd/update-gitops-image-tag.sh
+existing gympt-ops app workflow
 ../gympt-ops/gympt-gitops/argocd/applications/prod/backend-api.yaml
+.github/workflows/cd.yml
 scripts/cd/check-k8s-rollout.sh
 .github/workflows/quality-gate.yml
 scripts/quality-gate/query-prometheus-alerts.sh
@@ -855,7 +848,7 @@ scripts/quality-gate/send-slack-deploy-success.py
 Quality Gate
   -> Prometheus firing alert matched
   -> Grafana link build
-  -> Slack #cicd-deploy-alarm first failure alert
+  -> Slack #cd-deploy-alarm first failure alert
   -> EventBridge DeploymentFailed publish
 ```
 
@@ -878,7 +871,7 @@ EventBridge cd-quality-gate-prod-bus
   -> Athena SQL
   -> Athena summary
   -> AI Agent
-  -> Slack #cicd-deploy-alarm rollback/DR/change approval alert
+  -> Slack #cd-deploy-alarm rollback/DR/change approval alert
 ```
 
 관련 파일:
@@ -928,7 +921,7 @@ schemas/rollback/rollback-request.schema.json
 | Grafana | `https://grafana.g2mpt.com` |
 | main dashboard UID | `api-latency` |
 | EventBridge bus | `cd-quality-gate-prod-bus` |
-| Slack channel | `#cicd-deploy-alarm` |
+| Slack channel | `#cd-deploy-alarm` |
 | AWS region | `ap-northeast-2` |
 
 ## 15. 파일을 읽는 순서

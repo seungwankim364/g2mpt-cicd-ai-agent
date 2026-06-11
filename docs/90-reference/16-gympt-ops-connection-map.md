@@ -260,7 +260,7 @@ Lambda/Athena 분석 파이프라인을 prod부터 붙일지 dev부터 붙일지
 확정한 값:
 
 ```text
-Slack 채널은 신규 #cicd-deploy-alarm 사용
+Slack 채널은 신규 #cd-deploy-alarm 사용
 EventBridge는 개인 파트 전용 cd-quality-gate-prod-bus 사용
 Infra는 Terraform으로 관리
 backend-api-prod Quality Gate namespace는 gympt-prod 사용

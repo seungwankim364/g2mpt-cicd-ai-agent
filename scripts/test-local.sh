@@ -61,13 +61,13 @@ scripts/quality-gate/build-grafana-links.py \
   --namespace gympt-prod \
   --output-file "$TMP_DIR/grafana-links.json"
 
-SLACK_CHANNEL="#cicd-deploy-alarm" scripts/quality-gate/send-slack-first-alert.py \
+SLACK_CHANNEL="#cd-deploy-alarm" scripts/quality-gate/send-slack-first-alert.py \
   --result-file "$TMP_DIR/quality-gate-result-firing.json" \
   --links-file "$TMP_DIR/grafana-links.json" \
   --output-file "$TMP_DIR/slack-first-alert.json" \
   --dry-run
 
-SLACK_CHANNEL="#cicd-deploy-alarm" scripts/quality-gate/send-slack-deploy-success.py \
+SLACK_CHANNEL="#cd-deploy-alarm" scripts/quality-gate/send-slack-deploy-success.py \
   --service backend-api \
   --namespace gympt-prod \
   --image-tag fixture \

@@ -14,7 +14,7 @@ resource "aws_lambda_function" "analysis_orchestrator" {
       ATHENA_DATABASE        = aws_athena_database.logs.name
       ATHENA_WORKGROUP       = aws_athena_workgroup.cd_quality_gate.name
       ATHENA_OUTPUT_LOCATION = "s3://${aws_s3_bucket.analysis_results.bucket}/athena-results/"
-      SLACK_CHANNEL          = "#cicd-deploy-alarm"
+      SLACK_CHANNEL          = "#cd-deploy-alarm"
     }
   }
 

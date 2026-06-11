@@ -45,9 +45,11 @@ AI Agent가 원인과 대응 방안을 추천하도록 만드는 것
 ## 주요 흐름
 
 ```text
-GitHub Actions CD
-  -> Argo CD Sync
-  -> Kubernetes Rollout 확인
+Existing gympt-ops CI/CD
+  -> build/test/ECR push/GitOps values update
+  -> Argo CD automated sync
+  -> Kubernetes Rollout 완료
+  -> CD Quality Gate extension 시작
   -> Prometheus API 조회
   -> Grafana Dashboard URL 생성
   -> Quality Gate 판단
@@ -76,4 +78,3 @@ Slack 1차 알림
 | Athena Analysis 설계 | S3 로그 분석 대상과 query 구조 |
 | AI Agent 설계 | 분석 입력, 출력, 추천 판단 구조 |
 | Slack Message 설계 | 1차 실패 알림과 2차 AI 분석 알림 |
-

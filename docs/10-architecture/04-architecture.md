@@ -12,15 +12,19 @@
 ## 2. 1단계: CD Quality Gate
 
 ```text
-GitHub Actions CD
-  -> GitOps Repository values-prod.yaml image tag push
+Existing gympt-ops CI/CD
+  -> Build/Test/Image creation/ECR push
+  -> GitOps Repository values-dev/prod.yaml image tag update
   -> Argo CD automated sync
-  -> Amazon EKS backend-api-prod rollout status
-  -> self-hosted runner queries internal Prometheus API
+  -> Amazon EKS backend-api-prod rollout
+  -> CD Quality Gate extension starts
+  -> self-hosted runner checks rollout and internal Prometheus API
   -> Quality Gate decision
 ```
 
-이 구조는 `gympt-ops`와 동일하게 GitOps repository를 source of truth로 둔다. GitHub Actions가 `argocd app sync`를 직접 실행하지 않고, `hj-3/gympt-gitops` main branch에 image tag 변경 commit을 push하면 `backend-api-prod` Argo CD Application의 `syncPolicy.automated`가 변경을 감지해 EKS에 배포한다.
+기존 `gympt-ops` CI/CD는 이미 build, test, image push, GitOps values update, Argo CD automated sync를 담당한다. 이 저장소는 그 앞단을 다시 만들지 않는다.
+
+이 저장소의 책임은 Argo CD가 EKS에 반영한 뒤 실행되는 post-deploy Quality Gate와, 실패 시 EventBridge/Athena/AI Agent 분석 파이프라인이다.
 
 Prometheus는 외부 공개 URL이 아니라 EKS 내부 service를 사용한다.
 

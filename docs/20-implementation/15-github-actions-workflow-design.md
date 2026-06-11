@@ -4,7 +4,7 @@
 
 이 문서는 CD Quality Gate를 GitHub Actions workflow에 어떻게 연결할지 정의한다.
 
-핵심은 기존 CD workflow가 Argo CD 배포 완료에서 끝나지 않고, 배포 직후 Prometheus 기반 health check를 수행한 뒤 CD 성공/실패를 결정하도록 확장하는 것이다.
+핵심은 기존 `gympt-ops` CD workflow가 담당하는 build/test/ECR push/GitOps values update/Argo CD sync를 다시 만들지 않고, 배포 직후 Prometheus 기반 health check와 AI incident analysis를 추가하는 것이다.
 
 ## 2. Workflow 구성
 
@@ -17,25 +17,23 @@
 
 | Workflow | 역할 |
 | --- | --- |
-| `cd.yml` | GitOps image tag update, Argo CD automated sync 트리거 |
+| `cd.yml` | 기존 배포 이후 Quality Gate를 수동 실행하거나 나중에 `gympt-ops` workflow에서 호출하기 위한 wrapper |
 | `quality-gate.yml` | Prometheus alert/metric 조회, quality gate 판단, Slack 알림, EventBridge 이벤트 발행 |
 
 ## 3. 전체 실행 순서
 
 ```text
-1. GitHub Actions CD 시작
-2. Docker image build
-3. ECR push
-4. GitOps Repository image tag 수정
-5. Argo CD automated sync가 Git 변경 감지
-6. self-hosted runner에서 Kubernetes rollout status 확인
-7. Prometheus alert 조회
-8. Prometheus metric 조회
-9. Quality Gate 평가
-10. 정상이면 CD 성공
-11. 실패면 Slack 1차 알림
-12. 실패면 EventBridge DeploymentFailed 이벤트 발행
-13. GitHub Actions job 실패 처리
+1. 기존 gympt-ops app CI/CD가 Docker image build, ECR push, GitOps values update 수행
+2. 기존 Argo CD automated sync가 EKS에 backend-api-prod 배포
+3. cd-quality-gate-architecture의 post-deploy wrapper 또는 quality-gate workflow 실행
+4. self-hosted runner에서 Kubernetes rollout status 확인
+5. Prometheus alert 조회
+6. Prometheus metric 조회
+7. Quality Gate 평가
+8. 정상이면 배포 완료 Slack 알림
+9. 실패면 Slack 1차 알림
+10. 실패면 EventBridge DeploymentFailed 이벤트 발행
+11. GitHub Actions job 실패 처리
 ```
 
 ## 4. `cd.yml` 설계
@@ -44,10 +42,6 @@
 
 ```yaml
 on:
-  push:
-    branches:
-      - main
-      - dev
   workflow_dispatch:
 ```
 
@@ -55,12 +49,11 @@ on:
 
 ```text
 AWS_ROLE_ARN
-GITOPS_PAT
 SLACK_WEBHOOK_URL
 PROMETHEUS_URL
 ```
 
-`gympt-ops`와 동일하게 GitHub Actions는 `GITOPS_PAT`로 `hj-3/gympt-gitops` main branch의 values file을 직접 갱신한다. Argo CD 직접 sync용 `ARGOCD_SERVER`, `ARGOCD_AUTH_TOKEN`은 기본 CD 경로에서 사용하지 않는다.
+`GITOPS_PAT`는 이 저장소의 필수 secret이 아니다. GitOps values update는 기존 `gympt-ops` app CI/CD가 이미 수행한다.
 
 `PROMETHEUS_URL`은 EKS 내부 kube-prometheus-stack service를 사용한다.
 
@@ -76,7 +69,6 @@ http://kube-prometheus-stack-prometheus.monitoring.svc:9090
 SERVICE_NAME
 ENVIRONMENT
 IMAGE_TAG
-COMMIT_SHA
 K8S_NAMESPACE
 K8S_DEPLOYMENT
 ```
@@ -85,18 +77,15 @@ K8S_DEPLOYMENT
 
 ```yaml
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-      - name: Configure AWS credentials
-      - name: Login to ECR
-      - name: Build image
-      - name: Push image
-      - name: Update GitOps image tag
-      - name: Wait Argo CD application
-      - name: Check Kubernetes rollout
-      - name: Run post-deploy quality gate
+  quality-gate:
+    uses: ./.github/workflows/quality-gate.yml
+    secrets: inherit
+    with:
+      service: backend-api
+      environment: prod
+      namespace: gympt-prod
+      deployment: backend-api-prod
+      image_tag: <deployed-image-tag>
 ```
 
 ## 5. `quality-gate.yml` 설계
@@ -118,10 +107,10 @@ on:
       image_tag:
         required: true
         type: string
-      commit_sha:
+      namespace:
         required: true
         type: string
-      argocd_app:
+      deployment:
         required: true
         type: string
 ```
@@ -131,13 +120,16 @@ on:
 ```yaml
 jobs:
   post-deploy-health-check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, eks]
     steps:
       - name: Checkout
+      - name: Check Kubernetes rollout
       - name: Query Prometheus alerts
       - name: Query Prometheus metrics
       - name: Build Grafana links
       - name: Evaluate quality gate
+      - name: Send Slack deploy success
+        if: success()
       - name: Send Slack first alert
         if: failure()
       - name: Publish EventBridge DeploymentFailed
@@ -188,7 +180,7 @@ Argo CD sync 실패
 Kubernetes rollout 실패
 ```
 
-초기 MVP에서는 위 실패들은 GitHub Actions 실패로만 처리하고, `DeploymentFailed`는 배포 후 품질 검증 실패에 집중하는 것이 좋다.
+초기 MVP에서 build/ECR/GitOps/Argo CD 실패는 기존 `gympt-ops` 알림과 운영 흐름에 맡긴다. 이 저장소의 `DeploymentFailed`는 배포 후 품질 검증 실패에 집중한다.
 
 ## 9. Slack 알림 포함 정보
 

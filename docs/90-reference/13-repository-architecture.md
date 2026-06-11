@@ -215,26 +215,28 @@ Reference
 현재 확정된 실행 흐름은 다음 tree를 기준으로 한다. 상세 파일별 설명은 `DOC-31. Runtime File Role and Architecture Flow`를 따른다.
 
 ```text
-GitHub Actions CD
-  -> scripts/cd/update-gitops-image-tag.sh
-  -> hj-3/gympt-gitops main
-    -> charts/backend-api/values-prod.yaml .image.tag 변경
-    -> Argo CD backend-api-prod automated sync
-      -> EKS gympt-prod/backend-api-prod rollout
-        -> Quality Gate on self-hosted runner
-          -> scripts/cd/check-k8s-rollout.sh
-          -> internal Prometheus API
-            -> scripts/quality-gate/query-prometheus-alerts.sh
-            -> scripts/quality-gate/query-prometheus-metrics.sh
-            -> scripts/quality-gate/evaluate-quality-gate.py
-              -> pass: scripts/quality-gate/send-slack-deploy-success.py
-              -> fail: scripts/quality-gate/send-slack-first-alert.py
-              -> fail: scripts/quality-gate/publish-eventbridge-event.sh
-                -> EventBridge cd-quality-gate-prod-bus
-                  -> Lambda analysis orchestrator
-                  -> Athena
-                  -> AI Agent
-                  -> Slack #cicd-deploy-alarm approval alert
+Existing gympt-ops app CI/CD
+  -> build/test
+  -> Docker image build
+  -> ECR push
+  -> GitOps values-dev/prod.yaml image tag update
+  -> Argo CD backend-api-prod automated sync
+    -> EKS gympt-prod/backend-api-prod rollout
+      -> cd-quality-gate-architecture extension
+        -> .github/workflows/quality-gate.yml on self-hosted runner
+        -> scripts/cd/check-k8s-rollout.sh
+        -> internal Prometheus API
+          -> scripts/quality-gate/query-prometheus-alerts.sh
+          -> scripts/quality-gate/query-prometheus-metrics.sh
+          -> scripts/quality-gate/evaluate-quality-gate.py
+            -> pass: scripts/quality-gate/send-slack-deploy-success.py
+            -> fail: scripts/quality-gate/send-slack-first-alert.py
+            -> fail: scripts/quality-gate/publish-eventbridge-event.sh
+              -> EventBridge cd-quality-gate-prod-bus
+                -> Lambda analysis orchestrator
+                -> Athena
+                -> AI Agent
+                -> Slack #cd-deploy-alarm approval alert
 ```
 
 ## 7. 추천 사용 방식

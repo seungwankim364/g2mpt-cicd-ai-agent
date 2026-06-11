@@ -29,8 +29,11 @@ gympt-ops
 ## 핵심 흐름
 
 ```text
-GitHub Actions CD
-  -> Argo CD sync / rollout 확인
+Existing gympt-ops CI/CD
+  -> build/test/ECR push/GitOps values update
+  -> Argo CD automated sync
+  -> EKS rollout 완료
+  -> cd-quality-gate-architecture extension 시작
   -> Prometheus alert 조회
   -> Quality Gate 판단
   -> 정상: CD 성공
@@ -49,10 +52,10 @@ GitHub Actions CD
 
 | 구분 | 위치 | 설명 |
 | --- | --- | --- |
-| CD workflow | [.github/workflows/cd.yml](.github/workflows/cd.yml) | GitOps values tag push 후 Argo CD automated sync 트리거 |
+| Post-deploy workflow | [.github/workflows/cd.yml](.github/workflows/cd.yml) | 기존 gympt-ops 배포 이후 Quality Gate 호출용 wrapper |
 | Quality Gate workflow | [.github/workflows/quality-gate.yml](.github/workflows/quality-gate.yml) | Prometheus 조회, Gate 판단, Slack/EventBridge 연동 |
 | 샘플 workflow | [.github/workflows/cd-quality-gate-sample.yml](.github/workflows/cd-quality-gate-sample.yml) | fixture 기반 Quality Gate 실행 예시 |
-| CD 스크립트 | [scripts/cd](scripts/cd) | GitOps image tag 수정, rollout 확인, Argo CD 수동 sync 보조 도구 |
+| CD 보조 스크립트 | [scripts/cd](scripts/cd) | rollout 확인, 선택적 GitOps/Argo CD 수동 운영 보조 도구 |
 | 서비스 설정 | [config/services/backend-api.yaml](config/services/backend-api.yaml) | backend-api 기준 서비스 설정 |
 | Quality Gate 설정 | [config/quality-gate](config/quality-gate) | threshold, alert mapping, Grafana dashboard 설정 |
 | Prometheus 조회 | [scripts/quality-gate/query-prometheus-alerts.sh](scripts/quality-gate/query-prometheus-alerts.sh) | Prometheus alert 조회 또는 fixture 사용 |
@@ -81,7 +84,7 @@ GitHub Actions CD
 | Argo CD App | `backend-api-prod` |
 | Deployment | `backend-api-prod` |
 | EventBridge | 개인 파트 전용 bus 사용: `cd-quality-gate-prod-bus` |
-| Slack Channel | 신규 채널 사용: `#cicd-deploy-alarm` |
+| Slack Channel | 신규 채널 사용: `#cd-deploy-alarm` |
 | Infra 관리 | Terraform 기준 |
 | 비용 태그 | `Project=cd-quality-gate`, `Environment=dev/prod`, `CostControl=auto-stop` |
 | 알림 종류 | 배포 완료, CD 실패 1차 알림, AI 분석/rollback/DR/change 승인 알림 |

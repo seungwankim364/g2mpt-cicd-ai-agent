@@ -684,7 +684,7 @@ README.md
 ServiceMonitor/PrometheusRule namespace 정합성을 gympt-ops read-only로 확인했다.
 backend-api-prod Quality Gate는 gympt-prod namespace 기준으로 평가하기로 확정했다.
 EventBridge는 개인 프로젝트 전용 bus를 새로 쓰기로 했다.
-Slack은 신규 #cicd-deploy-alarm 채널을 사용하기로 했다.
+Slack은 신규 #cd-deploy-alarm 채널을 사용하기로 했다.
 Infra는 Terraform으로 관리하기로 했다.
 AWS 리소스에는 비용 추적/stop 기준 tag를 넣도록 Terraform을 보강했다.
 로컬 전체 검증 스크립트 scripts/test-local.sh를 추가했다.
@@ -742,7 +742,7 @@ README.md
 
 ```text
 EventBridge bus: cd-quality-gate-prod-bus
-Slack channel: #cicd-deploy-alarm
+Slack channel: #cd-deploy-alarm
 Infra: Terraform
 AWS tag: Project=cd-quality-gate, Environment=dev/prod, CostControl=auto-stop
 ```
@@ -920,4 +920,93 @@ docs/20-implementation/README.md
 docs/README.md
 README.md
 work-log.md
+```
+
+### 2026-06-11 14:37 - 배포 전체 구현이 아니라 post-deploy 확장 범위로 정정
+
+작업:
+
+```text
+사용자 피드백 기준으로 범위를 다시 정리했다.
+기존 gympt-ops가 build/test, ECR push, GitOps values update, Argo CD automated sync를 이미 담당한다는 점을 문서와 workflow에 반영했다.
+cd-quality-gate-architecture는 기존 배포 이후 Quality Gate와 AI Incident Analysis만 추가하는 저장소로 정리했다.
+이 저장소의 필수 GitHub Secret에서 GITOPS_PAT를 제외하고 PROMETHEUS_URL, SLACK_WEBHOOK_URL, AWS_ROLE_ARN만 남겼다.
+cd-quality-gate-ai-incident-analysis.drawio의 GitHub/GitOps/Argo CD/EKS/Prometheus 라벨을 post-deploy Quality Gate 흐름에 맞췄다.
+```
+
+수정 파일:
+
+```text
+.github/workflows/cd.yml
+README.md
+cd-quality-gate-ai-incident-analysis.drawio
+docs/00-overview/00-overview.md
+docs/00-overview/01-old-vs-new.md
+docs/00-overview/03-goals-and-scope.md
+docs/10-architecture/04-architecture.md
+docs/10-architecture/05-detailed-flows.md
+docs/20-implementation/09-implementation-plan.md
+docs/20-implementation/14-implementation-file-architecture.md
+docs/20-implementation/15-github-actions-workflow-design.md
+docs/20-implementation/22-test-and-validation-plan.md
+docs/20-implementation/24-operations-runbook.md
+docs/20-implementation/25-rollback-workflow-design.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+docs/90-reference/12-ids-and-terms.md
+docs/90-reference/13-repository-architecture.md
+work-log.md
+```
+
+주의:
+
+```text
+gympt-ops는 계속 read-only reference다.
+scripts/cd/update-gitops-image-tag.sh는 선택 보조 도구로만 남긴다.
+기본 실행 경로는 기존 배포 완료 후 .github/workflows/quality-gate.yml 실행이다.
+```
+
+검증:
+
+```text
+오래된 GitHub Actions CD/GitOps 직접 수행 표현 검색 후 핵심 문서 정정
+GitHub Actions YAML 파싱 통과
+scripts/test-local.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+```
+
+### 2026-06-11 14:54 - Slack 알림 채널명 변경
+
+작업:
+
+```text
+Slack 알림 채널명을 #cicd-deploy-alarm에서 #cd-deploy-alarm으로 변경했다.
+workflow, config, Terraform Lambda env/output, README, runtime 문서, secrets 문서, 로컬 테스트 스크립트의 채널명을 모두 맞췄다.
+```
+
+수정 파일:
+
+```text
+.github/workflows/quality-gate.yml
+README.md
+scripts/test-local.sh
+config/environments/dev.yaml
+config/environments/prod.yaml
+config/gympt-ops/connection-values.yaml
+infra/terraform/lambda.tf
+infra/terraform/outputs.tf
+docs/10-architecture/05-detailed-flows.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+docs/90-reference/13-repository-architecture.md
+docs/90-reference/16-gympt-ops-connection-map.md
+work-log.md
+```
+
+검증:
+
+```text
+이전 채널명 #cicd-deploy-alarm 검색 결과 없음
+GitHub Actions YAML 파싱 통과
+terraform -chdir=infra/terraform fmt -check 통과
 ```

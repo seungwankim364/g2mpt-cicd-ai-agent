@@ -40,7 +40,7 @@
 
 | ID | Component | 역할 |
 | --- | --- | --- |
-| CMP-GHA | GitHub Actions CD | CD 실행, health check, EventBridge 이벤트 발행 |
+| CMP-GHA | Post-deploy Quality Gate workflow | 기존 `gympt-ops` 배포 이후 health check, Slack 알림, EventBridge 이벤트 발행 |
 | CMP-GITOPS | GitOps Repository | image tag 변경 저장소 |
 | CMP-ARGO | Argo CD | GitOps 기반 Kubernetes 배포 및 rollback |
 | CMP-EKS | Amazon EKS | 서비스 실행 환경 |

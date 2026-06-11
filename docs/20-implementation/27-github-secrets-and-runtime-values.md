@@ -16,14 +16,15 @@ AWS Lambda는 가능하면 AWS Secrets Manager에서 secret을 읽는다.
 
 ## 2. 현재 workflow가 실제로 읽는 값
 
-현재 코드 기준으로 GitHub Actions가 직접 읽는 secret은 아래 4개다.
+현재 코드 기준으로 이 저장소의 Quality Gate가 직접 읽는 secret은 아래 3개다.
 
 | Secret name | 필수 | 읽는 파일 | 사용 목적 |
 | --- | --- | --- | --- |
-| `GITOPS_PAT` | yes | `.github/workflows/cd.yml`, `scripts/cd/update-gitops-image-tag.sh` | `hj-3/gympt-gitops` main branch에 image tag 변경 commit push |
 | `PROMETHEUS_URL` | yes | `.github/workflows/quality-gate.yml`, `scripts/quality-gate/query-prometheus-alerts.sh`, `scripts/quality-gate/query-prometheus-metrics.sh` | Prometheus API 조회 |
-| `SLACK_WEBHOOK_URL` | yes | `.github/workflows/quality-gate.yml`, `scripts/quality-gate/send-slack-first-alert.py`, `scripts/quality-gate/send-slack-deploy-success.py` | Slack `#cicd-deploy-alarm` 알림 전송 |
-| `AWS_ROLE_ARN` | yes | GitHub Actions AWS credential step 추가 예정 | GitHub OIDC로 AWS role assume |
+| `SLACK_WEBHOOK_URL` | yes | `.github/workflows/quality-gate.yml`, `scripts/quality-gate/send-slack-first-alert.py`, `scripts/quality-gate/send-slack-deploy-success.py` | Slack `#cd-deploy-alarm` 알림 전송 |
+| `AWS_ROLE_ARN` | yes | `.github/workflows/quality-gate.yml` | GitHub OIDC로 AWS role assume 후 EventBridge event 발행 |
+
+`GITOPS_PAT`는 기존 `gympt-ops` app CI/CD가 GitOps values update를 수행할 때 사용하는 secret이다. 이 저장소는 기존 배포 앞단을 다시 수행하지 않으므로 `GITOPS_PAT`를 필수 secret으로 받지 않는다.
 
 대체 방식:
 
@@ -50,7 +51,6 @@ Repository
 등록할 값:
 
 ```text
-GITOPS_PAT
 PROMETHEUS_URL
 SLACK_WEBHOOK_URL
 AWS_ROLE_ARN
@@ -75,10 +75,10 @@ Repository
 | --- | --- | --- | --- |
 | `AWS_REGION` | `ap-northeast-2` | `.github/workflows/quality-gate.yml` | 나중에 variable로 분리 가능 |
 | `EVENT_BUS_NAME` | `cd-quality-gate-prod-bus` | `.github/workflows/quality-gate.yml` | Terraform output과 일치해야 함 |
-| `SLACK_CHANNEL` | `#cicd-deploy-alarm` | `.github/workflows/quality-gate.yml` | webhook 채널과 일치해야 함 |
+| `SLACK_CHANNEL` | `#cd-deploy-alarm` | `.github/workflows/quality-gate.yml` | webhook 채널과 일치해야 함 |
 | `GRAFANA_BASE_URL` | `https://grafana.g2mpt.com` | `.github/workflows/quality-gate.yml` step argument | dashboard link 생성 기준 |
 | `GRAFANA_DASHBOARD_UID` | `api-latency` | `.github/workflows/quality-gate.yml` step argument | backend-api main dashboard |
-| `GITOPS_REPO` | `hj-3/gympt-gitops` | `.github/workflows/cd.yml` | gympt-ops와 동일한 GitOps repository |
+| `GITOPS_REPO` | `hj-3/gympt-gitops` | 기존 gympt-ops app CI/CD | 이 저장소의 필수 runtime 값이 아님 |
 
 MVP에서는 코드에 고정된 값을 유지해도 된다. 여러 환경으로 확장할 때 GitHub Variables로 분리한다.
 
@@ -88,37 +88,44 @@ MVP에서는 코드에 고정된 값을 유지해도 된다. 여러 환경으로
 
 | 항목 | 입력 위치 | 입력 완료 | 확인 방법 |
 | --- | --- | --- | --- |
-| `GITOPS_PAT` | GitHub Repository Secret | no | `cd.yml` 실행 시 `hj-3/gympt-gitops` main에 commit/push 성공 |
 | `PROMETHEUS_URL` | GitHub Repository Secret | no | self-hosted runner에서 `/api/v1/alerts` 응답 수신 |
-| `SLACK_WEBHOOK_URL` | GitHub Repository Secret | no | `#cicd-deploy-alarm`에 테스트 알림 도착 |
+| `SLACK_WEBHOOK_URL` | GitHub Repository Secret | no | `#cd-deploy-alarm`에 테스트 알림 도착 |
 | `AWS_ROLE_ARN` | GitHub Repository Secret | no | `aws sts get-caller-identity` 성공 |
 | `cd-quality-gate/slack/webhook-url` | AWS Secrets Manager | no | Lambda가 Slack 2차 알림 전송 |
 | `cd-quality-gate/ai-agent/api-key` | AWS Secrets Manager | no | 외부 AI Agent endpoint 사용 시 인증 성공 |
 
 ## 6. `GITOPS_PAT`
 
-목적:
+상태:
 
 ```text
-GitHub Actions가 gympt GitOps repository를 clone하고 backend-api image tag를 수정한 뒤 main branch에 직접 push한다.
+이 저장소의 필수 secret이 아니다.
+기존 gympt-ops app CI/CD가 GitOps values update를 수행할 때 사용한다.
 ```
 
-현재 사용 파일:
+기존 gympt-ops 책임:
 
 ```text
-.github/workflows/cd.yml
-scripts/cd/update-gitops-image-tag.sh
+app repository GitHub Actions
+  -> ECR push
+  -> pt-agent-gitops/gympt-gitops values-dev.yaml 또는 values-prod.yaml image tag update
+  -> PR 또는 commit
+  -> Argo CD automated sync
 ```
 
-현재 workflow 입력:
+이 저장소 책임:
 
 ```text
-GITOPS_REPO: hj-3/gympt-gitops
-GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
-VALUES_FILE: charts/backend-api/values-prod.yaml
+post-deploy Quality Gate
+Prometheus alert/metric check
+Slack deploy/failure alert
+EventBridge DeploymentFailed event
+AI incident analysis
 ```
 
-gympt-ops 기준 방식:
+따라서 이 저장소에 넣을 GitHub Secret 목록에서 `GITOPS_PAT`는 제외한다.
+
+참고:
 
 ```text
 gympt-app CI workflow가 charts/<service>/values-prod.yaml의 .image.tag를 변경
@@ -126,22 +133,7 @@ PR 생성 없이 gympt-gitops main branch에 직접 commit/push
 Argo CD Application의 syncPolicy.automated가 Git 변경을 감지해 자동 배포
 ```
 
-주의:
-
-```text
-GITOPS_PAT에는 hj-3/gympt-gitops repository contents write 권한이 필요하다.
-main branch direct push가 branch protection으로 막혀 있으면 GITOPS_PAT에 bypass 권한을 부여하거나 보호 규칙을 조정해야 한다.
-secret 원문은 문서와 log에 남기지 않는다.
-```
-
-확인 방법:
-
-```text
-cd.yml workflow 실행
-Update GitOps image tag step에서 dry-run 메시지가 없어야 함
-hj-3/gympt-gitops main branch에 ci: update backend-api prod image commit이 생성되어야 함
-Argo CD backend-api-prod Application이 자동 sync되어야 함
-```
+나중에 이 저장소가 직접 배포 트리거까지 담당하도록 범위를 확장할 때만 `GITOPS_PAT` 또는 GitHub App/Deploy Key 방식을 다시 검토한다.
 
 ## 7. `PROMETHEUS_URL`
 
@@ -220,13 +212,13 @@ scripts/quality-gate/send-slack-deploy-success.py
 대상 채널:
 
 ```text
-#cicd-deploy-alarm
+#cd-deploy-alarm
 ```
 
 주의:
 
 ```text
-Incoming webhook이 특정 채널에 고정되는 Slack 설정이면 webhook 생성 시 #cicd-deploy-alarm을 선택한다.
+Incoming webhook이 특정 채널에 고정되는 Slack 설정이면 webhook 생성 시 #cd-deploy-alarm을 선택한다.
 webhook URL은 절대 문서, 코드, work-log에 기록하지 않는다.
 ```
 
@@ -336,17 +328,26 @@ Prometheus alert/metric 조회
 
 ## 12. GitOps 인증
 
-`GITOPS_PAT`로 `hj-3/gympt-gitops` repository를 clone/push한다.
+GitOps 인증은 기존 `gympt-ops` app CI/CD 책임이다.
 
-필요한 인증 방식 후보:
+```text
+pt-agent-app 또는 gympt-app workflow
+  -> ECR image push
+  -> GitOps values image tag update
+  -> Argo CD automated sync
+```
 
-| 방식 | 필요한 secret | 비고 |
-| --- | --- | --- |
-| PAT | `GITOPS_PAT` | gympt-ops 기존 workflow와 동일한 방식 |
-| Deploy key | `GITOPS_DEPLOY_KEY` | 나중에 권한을 더 좁힐 때 검토 |
-| GitHub App token | `GITOPS_APP_ID`, `GITOPS_APP_PRIVATE_KEY` | 조직/권한 관리에 유리 |
+이 저장소는 GitOps repository에 push하지 않는다.
 
-MVP에서는 `GITOPS_PAT`를 사용해 `gympt-ops`와 맞춘다.
+따라서 이 저장소의 GitHub Secrets에는 아래 값을 넣지 않는다.
+
+```text
+GITOPS_PAT
+GITOPS_DEPLOY_KEY
+GITOPS_APP_PRIVATE_KEY
+```
+
+나중에 이 저장소가 독립 배포 트리거까지 담당하도록 범위가 바뀌면 그때 GitOps 인증 방식을 다시 설계한다.
 
 ## 13. 환경별 값
 
@@ -361,7 +362,7 @@ MVP에서는 `GITOPS_PAT`를 사용해 `gympt-ops`와 맞춘다.
 | Argo CD app | `backend-api-prod` |
 | values file | `charts/backend-api/values-prod.yaml` |
 | EventBridge bus | `cd-quality-gate-prod-bus` |
-| Slack channel | `#cicd-deploy-alarm` |
+| Slack channel | `#cd-deploy-alarm` |
 | AWS region | `ap-northeast-2` |
 | Grafana base URL | `https://grafana.g2mpt.com` |
 | Grafana dashboard UID | `api-latency` |
@@ -371,28 +372,25 @@ MVP에서는 `GITOPS_PAT`를 사용해 `gympt-ops`와 맞춘다.
 실제 값은 아래 순서로 넣는다.
 
 ```text
-1. Slack #cicd-deploy-alarm 채널 생성
+1. Slack #cd-deploy-alarm 채널 생성
 2. Slack incoming webhook 생성
 3. GitHub Secret SLACK_WEBHOOK_URL 등록
 4. self-hosted runner를 EKS/VPC 내부에 준비
 5. GitHub Secret PROMETHEUS_URL 등록
-6. GitHub Secret GITOPS_PAT 등록
-7. GitOps main branch direct push 또는 bypass 권한 확인
-8. AWS OIDC role 생성
-9. GitHub Secret AWS_ROLE_ARN 등록
-10. Terraform으로 EventBridge/Lambda/S3/Athena 생성
-11. AWS Secrets Manager에 Lambda용 Slack/AI secret 값 주입
-12. quality-gate.yml workflow_dispatch로 먼저 테스트
-13. cd.yml 전체 흐름 테스트
+6. AWS OIDC role 생성
+7. GitHub Secret AWS_ROLE_ARN 등록
+8. Terraform으로 EventBridge/Lambda/S3/Athena 생성
+9. AWS Secrets Manager에 Lambda용 Slack/AI secret 값 주입
+10. 기존 gympt-ops 배포 완료 후 quality-gate.yml workflow_dispatch로 먼저 테스트
+11. 기존 gympt-ops workflow에서 Quality Gate 호출 방식 연결
 ```
 
 ## 15. 실제 연결 전 체크
 
 ```text
 GitHub Secrets에 값이 들어갔는가
-Slack webhook URL이 #cicd-deploy-alarm으로 연결되는가
+Slack webhook URL이 #cd-deploy-alarm으로 연결되는가
 PROMETHEUS_URL이 self-hosted runner에서 접근 가능한가
-GITOPS_PAT로 hj-3/gympt-gitops main에 clone/push 가능한가
 Argo CD backend-api-prod Application의 automated sync가 켜져 있는가
 AWS_ROLE_ARN이 events:PutEvents 권한을 갖는가
 EventBridge bus 이름이 Terraform output과 workflow 값이 일치하는가
@@ -405,9 +403,9 @@ workflow log에 secret 원문이 출력되지 않는가
 | 항목 | 선택지 | 현재 상태 |
 | --- | --- | --- |
 | Prometheus 접근 방식 | EKS/VPC 내부 self-hosted runner | gympt-ops 방식으로 확정 |
-| GitOps push 인증 | `GITOPS_PAT` | gympt-ops 방식으로 확정 |
-| Argo CD sync 방식 | GitOps push 후 automated sync | gympt-ops 방식으로 확정 |
+| GitOps push 인증 | 기존 gympt-ops app CI/CD가 담당 | 이 저장소 범위 아님 |
+| Argo CD sync 방식 | 기존 GitOps push 후 automated sync | gympt-ops 방식 사용 |
 | AWS 인증 | GitHub OIDC 권장 | `AWS_ROLE_ARN` 필요 |
 | Lambda Slack secret 전달 | Secrets Manager 권장 | Terraform secret container 있음 |
 
-남은 것은 실제 secret 값을 넣고 self-hosted runner label을 준비한 뒤 workflow dry-run을 실행하는 것이다.
+남은 것은 실제 secret 값을 넣고 self-hosted runner label을 준비한 뒤, 기존 gympt-ops 배포 완료 후 Quality Gate dry-run을 실행하는 것이다.

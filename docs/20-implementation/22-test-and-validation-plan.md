@@ -177,8 +177,8 @@ Grafana/Argo CD 링크 포함
 ### Scenario A. 정상 배포
 
 ```text
-GitHub Actions CD 실행
-Argo CD sync 성공
+기존 gympt-ops 배포 완료
+Post-deploy Quality Gate 실행
 rollout 성공
 Prometheus alert 없음
 CD 성공
@@ -187,7 +187,8 @@ CD 성공
 ### Scenario B. Error Rate 증가
 
 ```text
-GitHub Actions CD 실행
+기존 gympt-ops 배포 완료
+Post-deploy Quality Gate 실행
 rollout 성공
 Prometheus BackendHighErrorRate firing
 Quality Gate 실패
@@ -218,4 +219,3 @@ AI Agent output schema validation 통과
 Slack message snapshot test 통과
 dev 환경에서 Scenario A/B 실행 가능
 ```
-

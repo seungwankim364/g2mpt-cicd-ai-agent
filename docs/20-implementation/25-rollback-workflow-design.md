@@ -105,8 +105,8 @@ argocd app rollback backend-api-prod <history-id>
 ```text
 rollback.yml
   validate-approval
-  update-gitops-image-tag
-  sync-argocd
+  request existing GitOps rollback change
+  wait-argocd-automated-sync
   wait-rollout
   run-quality-gate
   notify-result
@@ -182,4 +182,3 @@ GitOps repository에 rollback commit이 남음
 rollback 후 Quality Gate가 재실행됨
 성공/실패 결과가 Slack으로 전송됨
 ```
-

@@ -3,7 +3,7 @@ qualityGate:
   enabled: true
   failOnWarning: false
 notifications:
-  slackChannel: "#cicd-deploy-alarm"
+  slackChannel: "#cd-deploy-alarm"
 aws:
   region: ap-northeast-2
   resultBucket: cd-quality-gate-dev-results

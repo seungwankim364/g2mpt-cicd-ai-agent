@@ -45,15 +45,15 @@ WAF/ALB/CloudFront 로그에서는 비정상 트래픽이 증가함
 
 ## New. 개선된 구조
 
-개선된 구조는 배포 완료 이후 Prometheus와 Grafana를 사용해 서비스 상태를 검증한다.
+개선된 구조는 기존 `gympt-ops` CI/CD가 배포를 완료한 이후 Prometheus와 Grafana를 사용해 서비스 상태를 검증한다. build, ECR push, GitOps values update, Argo CD sync는 기존 흐름을 그대로 사용하고, 그 뒤에 Quality Gate와 AI Incident Analysis를 추가한다.
 
 ```text
-코드 Push
-  -> GitHub Actions CD
+기존 gympt-ops CI/CD
   -> ECR Push
   -> GitOps Repository Image Tag 수정
   -> Argo CD Sync
-  -> Kubernetes Rollout 확인
+  -> Kubernetes Rollout 완료
+  -> cd-quality-gate-architecture extension
   -> Prometheus Alert / Metric 확인
   -> Grafana Dashboard URL 생성
   -> Quality Gate 판단
@@ -101,4 +101,3 @@ After:
 ## 설계 의도
 
 이 구조의 핵심은 CD 파이프라인이 단순히 "배포 명령을 수행하는 자동화"에서 끝나지 않고, 실제 운영 품질을 검증하는 품질 게이트 역할까지 수행하도록 확장하는 것이다.
-

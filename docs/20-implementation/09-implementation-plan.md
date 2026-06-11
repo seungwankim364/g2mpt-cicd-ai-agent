@@ -12,8 +12,8 @@
 ### 작업
 
 ```text
-1. GitHub Actions CD workflow에 post-deploy-health-check job 추가
-2. Argo CD automated sync 이후 Kubernetes rollout 확인
+1. 기존 gympt-ops 배포 이후 실행되는 Quality Gate workflow 구성
+2. Argo CD automated sync 완료 이후 Kubernetes rollout 확인
 3. kubectl rollout status 확인
 4. Prometheus API /api/v1/alerts 조회
 5. 관련 alert가 firing이면 job 실패 처리

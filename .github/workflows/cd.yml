@@ -1,4 +1,4 @@
-name: CD
+name: Post Deploy Quality Gate
 
 on:
   workflow_dispatch:
@@ -11,39 +11,26 @@ on:
         description: Deployment environment
         required: true
         default: prod
+      namespace:
+        description: Kubernetes namespace already deployed by Argo CD
+        required: true
+        default: gympt-prod
+      deployment:
+        description: Kubernetes deployment already deployed by Argo CD
+        required: true
+        default: backend-api-prod
       image_tag:
-        description: Image tag to deploy
+        description: Image tag deployed by existing app CI/CD
         required: true
         default: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:latest
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    env:
-      SERVICE_NAME: ${{ inputs.service }}
-      ENVIRONMENT: ${{ inputs.environment }}
-      IMAGE_TAG: ${{ inputs.image_tag }}
-      GITOPS_REPO: hj-3/gympt-gitops
-      GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
-      VALUES_FILE: charts/backend-api/values-prod.yaml
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update GitOps image tag
-        run: scripts/cd/update-gitops-image-tag.sh
-
   quality-gate:
-    needs: deploy
     uses: ./.github/workflows/quality-gate.yml
     with:
       service: ${{ inputs.service }}
       environment: ${{ inputs.environment }}
-      namespace: gympt-prod
-      deployment: backend-api-prod
+      namespace: ${{ inputs.namespace }}
+      deployment: ${{ inputs.deployment }}
       image_tag: ${{ inputs.image_tag }}
     secrets: inherit

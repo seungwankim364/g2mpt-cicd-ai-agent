@@ -124,8 +124,8 @@ cd-quality-gate/
 
 | Folder | 역할 |
 | --- | --- |
-| `.github/workflows/` | GitHub Actions CD와 Quality Gate workflow |
-| `scripts/cd/` | GitOps image tag 변경, Argo CD sync 확인, rollout 확인 |
+| `.github/workflows/` | 기존 배포 이후 실행할 Quality Gate workflow와 wrapper |
+| `scripts/cd/` | rollout 확인, 선택적 GitOps/Argo CD 수동 운영 보조 도구 |
 | `scripts/quality-gate/` | Prometheus 조회, 품질 게이트 판단, Slack 알림, EventBridge 발행 |
 | `scripts/runbooks/` | alert별 대응 shell script |
 | `lambda/analysis-orchestrator/` | EventBridge 이벤트를 받아 Athena와 AI 분석을 실행하는 Lambda |
@@ -144,25 +144,16 @@ cd-quality-gate/
 역할:
 
 ```text
-Docker Image Build
-ECR Push
-GitOps Repository image tag 수정
-Argo CD Sync 대기
-Kubernetes rollout 확인
-quality-gate workflow 호출
+기존 gympt-ops 배포 이후 Quality Gate workflow를 호출하는 wrapper
 ```
 
 주요 step:
 
 ```text
-1. checkout
-2. configure aws credentials
-3. docker build
-4. docker push
-5. update GitOps image tag
-6. Argo CD automated sync가 Git 변경을 감지
-7. run post-deploy quality gate
-8. self-hosted runner에서 kubectl rollout status
+1. workflow_dispatch 입력 수신
+2. service/environment/namespace/deployment/image_tag 전달
+3. .github/workflows/quality-gate.yml reusable workflow 호출
+4. quality-gate.yml 내부에서 self-hosted runner로 rollout/Prometheus 검증
 ```
 
 ### `.github/workflows/quality-gate.yml`
@@ -182,7 +173,9 @@ EventBridge DeploymentFailed 이벤트 발행
 
 ### `scripts/cd/update-gitops-image-tag.sh`
 
-GitOps repository의 Helm values 또는 Kustomize image tag를 새 image tag로 갱신한다.
+GitOps repository의 Helm values 또는 Kustomize image tag를 새 image tag로 갱신하는 선택 보조 도구다.
+
+현재 기본 통합 범위에서는 이 스크립트를 사용하지 않는다. GitOps values update는 기존 `gympt-ops` app CI/CD가 담당한다.
 
 입력:
 
@@ -205,7 +198,7 @@ GitOps commit SHA
 
 Argo CD application sync와 health 상태를 대기하는 선택 도구다.
 
-기본 운영 흐름은 `gympt-ops`와 동일하게 GitOps repository에 image tag를 push하고 Argo CD `syncPolicy.automated`가 자동 배포하도록 둔다. 따라서 `cd.yml` 기본 경로에서는 이 script를 호출하지 않는다.
+기존 `gympt-ops` 운영 흐름은 GitOps repository에 image tag를 push하고 Argo CD `syncPolicy.automated`가 자동 배포하도록 되어 있다. 이 저장소의 기본 경로는 그 이후 Quality Gate만 수행하므로 `cd.yml`에서 이 script를 호출하지 않는다.
 
 사용 명령:
 
@@ -640,14 +633,17 @@ EventBridge Lambda handler 테스트에 사용할 sample event다.
 ## 15. 실제 실행 흐름과 파일 매핑
 
 ```text
-GitHub Actions CD
-  -> .github/workflows/cd.yml
-  -> scripts/cd/update-gitops-image-tag.sh
-  -> scripts/cd/wait-argocd-app.sh
-  -> scripts/cd/check-k8s-rollout.sh
+Existing gympt-ops app CI/CD
+  -> build/test
+  -> ECR push
+  -> GitOps values-dev/prod.yaml image tag update
+  -> Argo CD automated sync
+  -> EKS gympt-prod/backend-api-prod rollout
 
 Post Deploy Quality Gate
+  -> .github/workflows/cd.yml
   -> .github/workflows/quality-gate.yml
+  -> scripts/cd/check-k8s-rollout.sh
   -> scripts/quality-gate/query-prometheus-alerts.sh
   -> scripts/quality-gate/query-prometheus-metrics.sh
   -> scripts/quality-gate/evaluate-quality-gate.py
