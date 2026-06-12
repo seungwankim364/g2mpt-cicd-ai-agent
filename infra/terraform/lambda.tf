@@ -3,7 +3,7 @@ resource "aws_lambda_function" "analysis_orchestrator" {
   role                           = aws_iam_role.analysis_orchestrator.arn
   handler                        = "app.handler"
   runtime                        = "python3.12"
-  filename                       = "build/analysis-orchestrator.zip"
+  filename                       = "${path.module}/../../build/analysis-orchestrator.zip"
   timeout                        = 300
   memory_size                    = 512
   reserved_concurrent_executions = 2
@@ -45,15 +45,16 @@ resource "aws_lambda_function" "slack_approval_handler" {
   role                           = aws_iam_role.slack_approval_handler.arn
   handler                        = "app.handler"
   runtime                        = "python3.12"
-  filename                       = "build/slack-approval-handler.zip"
+  filename                       = "${path.module}/../../build/slack-approval-handler.zip"
   timeout                        = 10
   memory_size                    = 256
   reserved_concurrent_executions = 2
 
   environment {
     variables = {
-      EVENT_BUS_NAME       = aws_cloudwatch_event_bus.cd_quality_gate.name
-      SLACK_SIGNING_SECRET = var.slack_signing_secret
+      EVENT_BUS_NAME           = aws_cloudwatch_event_bus.cd_quality_gate.name
+      SLACK_SIGNING_SECRET     = var.slack_signing_secret
+      SLACK_SIGNING_SECRET_ARN = var.slack_signing_secret_arn
     }
   }
 
@@ -65,7 +66,7 @@ resource "aws_lambda_function" "deployment_action_executor" {
   role                           = aws_iam_role.deployment_action_executor.arn
   handler                        = "app.handler"
   runtime                        = "python3.12"
-  filename                       = "build/deployment-action-executor.zip"
+  filename                       = "${path.module}/../../build/deployment-action-executor.zip"
   timeout                        = 30
   memory_size                    = 256
   reserved_concurrent_executions = 1

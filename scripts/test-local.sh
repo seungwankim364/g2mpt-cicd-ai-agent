@@ -135,7 +135,7 @@ PYTHONPATH=ai-agent python3 -m app.main \
 
 LOCAL_RESULT_DIR="$TMP_DIR/lambda-results" python3 lambda/analysis-orchestrator/app.py >/dev/null
 
-echo "[8/8] AWS stop script help"
-scripts/aws/stop-after-work.sh --help >/dev/null
+echo "[8/8] AWS terraform destroy script help"
+scripts/aws/destroy-terraform-stack.sh --help >/dev/null
 
 echo "Local test passed. Artifacts: $TMP_DIR"

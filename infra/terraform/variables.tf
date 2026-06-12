@@ -40,6 +40,12 @@ variable "slack_signing_secret" {
   sensitive = true
 }
 
+variable "slack_signing_secret_arn" {
+  type        = string
+  default     = ""
+  description = "AWS Secrets Manager ARN for Slack app signing secret. Prefer this over slack_signing_secret."
+}
+
 variable "github_token_secret_arn" {
   type    = string
   default = ""

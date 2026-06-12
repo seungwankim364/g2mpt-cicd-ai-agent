@@ -1,5 +1,11 @@
 __pycache__/
 *.pyc
+*.tfvars
+*.tfvars.json
+**/.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
 
 quality-gate-alerts.json
 quality-gate-result.json

@@ -6,5 +6,4 @@
 
 - [DOC-26 Operations Runbook](20-implementation/24-operations-runbook.md)
 - [DOC-27 Rollback Workflow Design](20-implementation/25-rollback-workflow-design.md)
-- [scripts/aws/stop-after-work.sh](../scripts/aws/stop-after-work.sh)
-
+- [scripts/aws/destroy-terraform-stack.sh](../scripts/aws/destroy-terraform-stack.sh)

@@ -184,49 +184,51 @@ postmortem 필요 여부 결정
 
 ## 12. 퇴근 전 비용 절감 절차
 
-개인 실습 또는 개발 환경에서 만든 AWS 리소스는 퇴근 전에 중지하거나 scale down한다.
+이 프로젝트에서 Terraform으로 만든 AWS 리소스는 Lambda, EventBridge, API Gateway, Athena, S3처럼 stop 개념이 없는 serverless 관리 리소스가 중심이다. 퇴근 전 비용 정리는 stop/scale down이 아니라 Terraform stack destroy를 기준으로 한다.
 
 사용 스크립트:
 
 ```text
-scripts/aws/stop-after-work.sh
+scripts/aws/destroy-terraform-stack.sh
 ```
 
-기본 실행은 dry-run이다.
+기본 실행은 dry-run이며 destroy plan만 확인한다.
 
 ```bash
+AWS_PROFILE_NAME=ksw2 \
 AWS_REGION=ap-northeast-2 \
-TAG_KEY=Project \
-TAG_VALUE=cd-quality-gate \
-ENVIRONMENT=dev \
-scripts/aws/stop-after-work.sh
+ENVIRONMENT=prod \
+scripts/aws/destroy-terraform-stack.sh
 ```
 
-실제로 중지하려면 `--execute`를 붙인다.
+실제로 삭제하려면 `ALLOW_PROD=true`와 `--execute`를 함께 붙인다.
 
 ```bash
+AWS_PROFILE_NAME=ksw2 \
 AWS_REGION=ap-northeast-2 \
-TAG_KEY=Project \
-TAG_VALUE=cd-quality-gate \
-ENVIRONMENT=dev \
-scripts/aws/stop-after-work.sh --execute
+ENVIRONMENT=prod \
+ALLOW_PROD=true \
+scripts/aws/destroy-terraform-stack.sh --execute
 ```
 
-대상 리소스:
+삭제 대상 리소스:
 
 ```text
-EC2 instance stop
-RDS DB instance/cluster stop
-ECS service desired count 0
-EKS managed nodegroup min/desired size 0
-Auto Scaling Group min/desired capacity 0
+Terraform state에 있는 cd-quality-gate-architecture stack 리소스
+Lambda
+EventBridge
+API Gateway
+Athena
+S3 result bucket
+IAM role/policy
 ```
 
 주의사항:
 
 ```text
-Project=cd-quality-gate, Environment=dev tag가 있는 리소스만 대상으로 함
-prod 환경은 기본적으로 차단됨
-리소스를 삭제하지 않고 중지 또는 scale down만 수행함
-scale down 전 상태는 .aws-stop-state/ 아래에 저장됨
+prod 환경 execute는 ALLOW_PROD=true 없이는 차단됨
+기존 수동 생성 Slack webhook secret은 state에서 제거해 destroy 대상에서 제외함
+기존 수동 생성 GitHub dispatch token secret은 Terraform state에 넣지 않음
+gympt-ops 리소스는 Terraform state에 없으므로 destroy 대상이 아님
+S3 result bucket은 destroy 전에 해당 bucket만 비움
 ```

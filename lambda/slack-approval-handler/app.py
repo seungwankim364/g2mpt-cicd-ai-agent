@@ -15,6 +15,8 @@ except ImportError:
 
 EVENT_BUS_NAME = os.environ.get("EVENT_BUS_NAME", "cd-quality-gate-prod-bus")
 SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET", "")
+SLACK_SIGNING_SECRET_ARN = os.environ.get("SLACK_SIGNING_SECRET_ARN", "")
+_SLACK_SIGNING_SECRET_CACHE = None
 
 
 def _body(event):
@@ -29,7 +31,8 @@ def _headers(event):
 
 
 def _verify_slack_signature(event, body):
-    if not SLACK_SIGNING_SECRET:
+    signing_secret = _slack_signing_secret()
+    if not signing_secret:
         return True
     headers = _headers(event)
     timestamp = headers.get("x-slack-request-timestamp", "")
@@ -39,8 +42,21 @@ def _verify_slack_signature(event, body):
     if abs(time.time() - int(timestamp)) > 60 * 5:
         return False
     base = f"v0:{timestamp}:{body}".encode("utf-8")
-    digest = hmac.new(SLACK_SIGNING_SECRET.encode("utf-8"), base, hashlib.sha256).hexdigest()
+    digest = hmac.new(signing_secret.encode("utf-8"), base, hashlib.sha256).hexdigest()
     return hmac.compare_digest(f"v0={digest}", signature)
+
+
+def _slack_signing_secret():
+    global _SLACK_SIGNING_SECRET_CACHE
+    if SLACK_SIGNING_SECRET:
+        return SLACK_SIGNING_SECRET
+    if _SLACK_SIGNING_SECRET_CACHE is not None:
+        return _SLACK_SIGNING_SECRET_CACHE
+    if boto3 is None or not SLACK_SIGNING_SECRET_ARN:
+        return ""
+    response = boto3.client("secretsmanager").get_secret_value(SecretId=SLACK_SIGNING_SECRET_ARN)
+    _SLACK_SIGNING_SECRET_CACHE = response.get("SecretString", "")
+    return _SLACK_SIGNING_SECRET_CACHE
 
 
 def _parse_payload(body):

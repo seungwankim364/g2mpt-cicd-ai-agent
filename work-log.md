@@ -1253,6 +1253,179 @@ gympt-app 배포 workflow는 workflow_dispatch 입력을 받아야 한다.
 gympt-app 배포 workflow 마지막에는 cd-quality-gate-architecture의 quality-gate.yml 호출이 있어야 Slack 배포 완료 알림까지 이어진다.
 ```
 
+### 2026-06-12 15:11 - Terraform destroy 기반 퇴근 전 비용 정리로 전환
+
+작업:
+
+```text
+Lambda, S3, Athena, EventBridge, API Gateway는 stop 개념이 없으므로 비용 정리 방식을 Terraform destroy 기준으로 바꿨다.
+기존 수동 생성 Slack webhook secret은 terraform state rm으로 state에서 제거해 destroy 대상에서 제외했다.
+Terraform destroy를 실행해 cd-quality-gate-prod stack 리소스를 삭제했다.
+S3 result bucket 안에 Athena 결과 객체 2개가 있어 bucket 삭제가 실패했으므로, cd-quality-gate-prod-results bucket 내부 객체만 비운 뒤 destroy를 재실행했다.
+퇴근 전 정리용 스크립트를 stop/scale down 방식이 아니라 Terraform destroy 방식으로 새로 추가했다.
+README와 운영 문서의 비용 절감 절차를 destroy 기준으로 갱신했다.
+```
+
+추가 파일:
+
+```text
+scripts/aws/destroy-terraform-stack.sh
+```
+
+수정 파일:
+
+```text
+README.md
+docs/operation-guide.md
+docs/20-implementation/24-operations-runbook.md
+scripts/test-local.sh
+work-log.md
+```
+
+삭제 검증:
+
+```text
+terraform state list 결과 0개
+cd-quality-gate-prod-analysis-orchestrator Lambda 조회 실패 확인
+cd-quality-gate-prod-bus EventBridge bus 조회 실패 확인
+cd-quality-gate-prod-results S3 bucket 조회 실패 확인
+cd-quality-gate-prod-workgroup Athena workgroup 조회 실패 확인
+cd-quality-gate-prod-slack-approval API Gateway 조회 결과 없음
+cd-quality-gate-prod/slack/webhook-url secret 보존 확인
+cd-quality-gate/github/dispatch-token secret 보존 확인
+```
+
+검증:
+
+```text
+bash -n scripts/aws/destroy-terraform-stack.sh 통과
+scripts/aws/destroy-terraform-stack.sh --help 통과
+bash -n scripts/test-local.sh 통과
+scripts/test-local.sh 통과
+```
+
+주의:
+
+```text
+scripts/aws/stop-after-work.sh는 EC2/RDS/ECS/EKS/ASG가 있는 다른 실습 리소스용으로 남아 있지만, 이 프로젝트의 기본 비용 정리는 scripts/aws/destroy-terraform-stack.sh를 사용한다.
+prod destroy는 ALLOW_PROD=true 없이는 차단된다.
+```
+
+### 2026-06-12 15:28 - apply 전 1/4/5번 점검 및 Slack signing secret 보강
+
+작업:
+
+```text
+AWS 리소스를 다시 올리지 않고 확인 가능한 항목 1, 4, 5를 파일 기준으로 점검했다.
+Terraform apply/destroy 순서를 Lambda zip -> fmt/validate/plan/apply -> output 확인 -> destroy 순서로 문서화했다.
+deployment-action-executor의 dispatch input과 rollback/dr/manual_fix/change workflow_dispatch input이 일치하는지 확인했다.
+dr/manual_fix/change에서 targetImageTag가 비어 있을 수 있으므로 executor가 currentImageTag로 fallback하도록 보강했다.
+Slack signing secret은 Terraform variable 원문 주입 대신 AWS Secrets Manager ARN을 우선 사용하도록 slack-approval-handler와 Terraform을 보강했다.
+apply 전 체크리스트 문서를 추가하고 README/docs index에 연결했다.
+```
+
+추가 파일:
+
+```text
+docs/20-implementation/28-pre-apply-verification-checklist.md
+```
+
+수정 파일:
+
+```text
+README.md
+docs/README.md
+docs/20-implementation/README.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+docs/90-reference/13-repository-architecture.md
+infra/terraform/iam.tf
+infra/terraform/lambda.tf
+infra/terraform/variables.tf
+lambda/deployment-action-executor/app.py
+lambda/slack-approval-handler/app.py
+work-log.md
+```
+
+검증:
+
+```text
+terraform fmt -check 통과
+terraform validate 통과
+python3 -m py_compile Lambda handler 2개 통과
+scripts/test-local.sh 통과
+scripts/lambda/package-analysis-orchestrator.sh 통과
+```
+
+남은 확인:
+
+```text
+Slack App Interactivity Request URL은 Terraform apply 후 새 slack_interactivity_url output으로 등록해야 한다.
+실제 GitHub repository에 대상 workflow가 존재하고 dispatch 가능한지는 apply 후 GitHub API smoke test로 확인한다.
+EKS/Prometheus/backend-api-prod가 살아난 뒤에만 실제 E2E 테스트가 가능하다.
+```
+
+### 2026-06-12 15:00 - Terraform 기반 AWS 리소스 생성 및 6개 체크리스트 테스트
+
+작업:
+
+```text
+AWS login 프로필 ksw2 세션을 갱신했다.
+Lambda zip 경로가 Terraform module 기준 build/를 바라보던 문제를 repo root build/ 기준으로 수정했다.
+Terraform fmt/validate/plan/apply를 실행해 cd-quality-gate-prod AWS 리소스를 생성했다.
+Slack webhook secret은 기존 AWS Secrets Manager secret을 Terraform state로 import한 뒤 태그를 Terraform 기준으로 관리하도록 정리했다.
+Bedrock Claude 3 Haiku smoke invoke를 실행해 모델 접근과 invoke 권한을 확인했다.
+stop-after-work.sh를 cd-quality-gate/prod 태그 기준 dry-run 및 execute로 실행해 gympt-ops 리소스가 대상에 잡히지 않음을 확인했다.
+```
+
+생성/확인 리소스:
+
+```text
+EventBridge bus: cd-quality-gate-prod-bus
+EventBridge rules: cd-quality-gate-prod-deployment-failed, cd-quality-gate-prod-deployment-action-approved
+Lambda: cd-quality-gate-prod-analysis-orchestrator
+Lambda: cd-quality-gate-prod-slack-approval-handler
+Lambda: cd-quality-gate-prod-deployment-action-executor
+S3: cd-quality-gate-prod-results
+Athena database: cd_quality_gate_prod_logs
+Athena workgroup: cd-quality-gate-prod-workgroup
+API Gateway: cd-quality-gate-prod-slack-approval
+Slack interactivity URL: https://i9q80h811i.execute-api.ap-northeast-2.amazonaws.com/slack/interactions
+```
+
+수정 파일:
+
+```text
+infra/terraform/lambda.tf
+.gitignore
+work-log.md
+```
+
+검증:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh 통과
+scripts/test-local.sh 통과
+terraform fmt -check 통과
+terraform validate 통과
+terraform plan 통과
+terraform apply 통과
+aws events describe-event-bus 확인
+aws lambda get-function 3개 Active 확인
+aws s3api get-bucket-tagging 확인: Project=cd-quality-gate, Environment=prod
+aws apigatewayv2 get-apis 확인
+aws athena get-work-group 확인
+aws bedrock-runtime invoke-model 확인: ok
+scripts/aws/stop-after-work.sh dry-run/execute 확인: EC2/RDS/ECS/EKS/ASG 매칭 0개
+```
+
+주의:
+
+```text
+현재 생성된 AWS 리소스는 대부분 serverless 관리 리소스라 stop-after-work.sh로 끌 대상이 없다.
+stop-after-work.sh는 삭제 스크립트가 아니며 EC2/RDS/ECS/EKS/ASG만 중지 또는 scale down한다.
+완전 삭제가 필요하면 이 Terraform stack 기준으로만 terraform destroy를 사용해야 한다.
+```
+
 ### 2026-06-12 10:12 - Amazon Bedrock AI 분석 연결
 
 작업:

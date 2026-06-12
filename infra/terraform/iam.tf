@@ -114,6 +114,13 @@ resource "aws_iam_role_policy" "slack_approval_handler" {
           "events:PutEvents"
         ]
         Resource = aws_cloudwatch_event_bus.cd_quality_gate.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = var.slack_signing_secret_arn != "" ? var.slack_signing_secret_arn : "arn:aws:secretsmanager:${var.aws_region}:*:secret:cd-quality-gate*"
       }
     ]
   })

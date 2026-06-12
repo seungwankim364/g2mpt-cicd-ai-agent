@@ -78,7 +78,7 @@ Existing gympt-ops CI/CD
 | Athena | [athena](athena) | query, query template, external table schema |
 | Infra | [infra](infra) | Terraform 기준 AWS 리소스 scaffold |
 | Schema | [schemas](schemas) | EventBridge, AI, Slack, rollback JSON schema |
-| AWS 비용 절감 | [scripts/aws/stop-after-work.sh](scripts/aws/stop-after-work.sh) | 퇴근 전 dev 리소스 stop/scale down |
+| AWS 비용 절감 | [scripts/aws/destroy-terraform-stack.sh](scripts/aws/destroy-terraform-stack.sh) | 퇴근 전 Terraform stack destroy |
 | 로컬 통합 테스트 | [scripts/test-local.sh](scripts/test-local.sh) | fixture 기반 전체 흐름 검증 |
 
 파일별 역할과 실제 실행 흐름은 [Runtime File Role and Architecture Flow](docs/20-implementation/26-runtime-file-role-and-architecture-flow.md)를 기준으로 본다. 이 문서는 `cd-quality-gate-ai-incident-analysis.drawio`의 각 박스가 어떤 `yml`, `sh`, `py`, Terraform 파일로 실행되는지 연결한다.
@@ -131,27 +131,26 @@ scripts/test-local.sh
 
 ## 퇴근 전 AWS 비용 절감
 
-개인 실습용 AWS 리소스는 tag 기준으로만 중지하거나 scale down한다. 기본 실행은 dry-run이다.
+이 프로젝트의 AWS 리소스는 Lambda, EventBridge, API Gateway, Athena, S3처럼 serverless 관리 리소스가 중심이다. 그래서 퇴근 전 비용 정리는 stop/scale down이 아니라 Terraform stack destroy를 기준으로 한다. 기본 실행은 dry-run이며 destroy plan만 확인한다.
 
 ```bash
+AWS_PROFILE_NAME=ksw2 \
 AWS_REGION=ap-northeast-2 \
-TAG_KEY=Project \
-TAG_VALUE=cd-quality-gate \
-ENVIRONMENT=dev \
-scripts/aws/stop-after-work.sh
+ENVIRONMENT=prod \
+scripts/aws/destroy-terraform-stack.sh
 ```
 
-실제로 실행하려면 `--execute`를 붙인다.
+실제로 삭제하려면 `ALLOW_PROD=true`와 `--execute`를 함께 붙인다.
 
 ```bash
+AWS_PROFILE_NAME=ksw2 \
 AWS_REGION=ap-northeast-2 \
-TAG_KEY=Project \
-TAG_VALUE=cd-quality-gate \
-ENVIRONMENT=dev \
-scripts/aws/stop-after-work.sh --execute
+ENVIRONMENT=prod \
+ALLOW_PROD=true \
+scripts/aws/destroy-terraform-stack.sh --execute
 ```
 
-대상은 `Project=cd-quality-gate`, `Environment=dev` tag가 붙은 리소스다. `prod` 환경은 기본적으로 차단한다.
+이 스크립트는 Terraform state에 있는 `cd-quality-gate-architecture` stack만 삭제한다. 기존에 수동으로 만든 Slack/GitHub Secrets Manager secret은 state에서 제거해 destroy 대상에서 제외한다.
 
 ## 문서 읽는 순서
 
@@ -210,7 +209,9 @@ scripts/aws/stop-after-work.sh --execute
 | DOC-23 | [Security and IAM Policy](docs/20-implementation/23-security-and-iam-policy.md) | 권한, secret, 보안 기준 |
 | DOC-26 | [Operations Runbook](docs/20-implementation/24-operations-runbook.md) | 운영자 장애 대응 절차 |
 | DOC-27 | [Rollback Workflow Design](docs/20-implementation/25-rollback-workflow-design.md) | 승인 기반 rollback workflow 설계 |
+| DOC-31 | [Runtime File Role and Architecture Flow](docs/20-implementation/26-runtime-file-role-and-architecture-flow.md) | yml/sh/py 파일별 역할과 실제 아키텍처 실행 흐름 |
 | DOC-32 | [GitHub Secrets and Runtime Values](docs/20-implementation/27-github-secrets-and-runtime-values.md) | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 정리 |
+| DOC-33 | [Pre-Apply Verification Checklist](docs/20-implementation/28-pre-apply-verification-checklist.md) | apply 전 Terraform, dispatch workflow, Slack signing secret 점검 |
 
 ### 30. Presentation
 
@@ -241,7 +242,7 @@ scripts/aws/stop-after-work.sh --execute
 gympt-ops는 참고만 한다.
 실제 수정은 이 저장소에서 먼저 한다.
 나중에 gympt-ops에 붙일 때는 최소 변경으로 적용한다.
-AWS 리소스는 dev tag를 붙이고, 퇴근 전 stop/scale down한다.
+AWS 리소스는 Terraform으로 만들고, 퇴근 전 cd-quality-gate stack만 destroy한다.
 rollback 같은 위험한 조치는 운영자 승인 이후에만 실행한다.
 ```
 
