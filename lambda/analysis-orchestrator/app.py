@@ -16,6 +16,7 @@ ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "cd_quality_gate_logs")
 ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "cd-quality-gate")
 ATHENA_OUTPUT_LOCATION = os.environ.get("ATHENA_OUTPUT_LOCATION", "")
 AI_AGENT_ENDPOINT = os.environ.get("AI_AGENT_ENDPOINT", "")
+BEDROCK_ENABLED = os.environ.get("BEDROCK_ENABLED", "false").lower() == "true"
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 SLACK_WEBHOOK_SECRET_ARN = os.environ.get("SLACK_WEBHOOK_SECRET_ARN", "")
 LOCAL_RESULT_DIR = os.environ.get("LOCAL_RESULT_DIR", "/tmp/cd-quality-gate-results")
@@ -120,18 +121,27 @@ def write_summary_to_s3(summary):
 
 
 def invoke_ai_agent(summary):
-    if not AI_AGENT_ENDPOINT:
-        from ai_agent_adapter import analyze_locally
+    if AI_AGENT_ENDPOINT:
+        request = urllib.request.Request(
+            AI_AGENT_ENDPOINT,
+            data=json.dumps(summary).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
 
-        return analyze_locally(summary)
-    request = urllib.request.Request(
-        AI_AGENT_ENDPOINT,
-        data=json.dumps(summary).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+    if BEDROCK_ENABLED:
+        try:
+            from bedrock_agent import analyze_with_bedrock
+
+            return analyze_with_bedrock(summary)
+        except Exception as error:
+            print(f"Bedrock analysis failed. Falling back to local ai-agent: {error}")
+
+    from ai_agent_adapter import analyze_locally
+
+    return analyze_locally(summary)
 
 
 def slack_webhook_url():

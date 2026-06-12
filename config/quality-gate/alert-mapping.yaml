@@ -45,3 +45,111 @@ alerts:
     recommendedActions:
       - manual_fix
       - observe
+
+  SQSQueueBacklog:
+    severity: warning
+    runbook: sqs-backlog.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - manual_fix
+      - observe
+
+  SQSMessageAge:
+    severity: critical
+    runbook: sqs-message-age.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - manual_fix
+      - dr
+
+  SQSDLQMessages:
+    severity: critical
+    runbook: sqs-dlq-messages.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - manual_fix
+      - dr
+
+  NodeHighCPUUsage:
+    severity: warning
+    runbook: node-high-cpu-usage.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - observe
+      - dr
+
+  PodRestartFrequent:
+    severity: warning
+    runbook: pod-restarting.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - rollback
+      - manual_fix
+
+  GPUHighUtilization:
+    severity: warning
+    runbook: gpu-high-utilization.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - observe
+      - manual_fix
+
+  GPUMemoryHigh:
+    severity: critical
+    runbook: gpu-memory-high.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - manual_fix
+      - dr
+
+  RedisConnectionError:
+    severity: critical
+    runbook: redis-connection-error.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - dr
+      - manual_fix
+
+  RedisHighMemory:
+    severity: warning
+    runbook: redis-high-memory.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - observe
+      - manual_fix
+
+  RedisHighEvictionRate:
+    severity: warning
+    runbook: redis-high-eviction-rate.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - observe
+      - manual_fix
+
+  BedrockHighErrorRate:
+    severity: critical
+    runbook: bedrock-high-error-rate.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - manual_fix
+      - observe
+
+  BedrockThrottling:
+    severity: warning
+    runbook: bedrock-throttling.sh
+    athenaQueries:
+      - application-error-patterns
+    recommendedActions:
+      - observe
+      - manual_fix

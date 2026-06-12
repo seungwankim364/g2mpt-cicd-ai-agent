@@ -14,6 +14,10 @@ resource "aws_lambda_function" "analysis_orchestrator" {
       ATHENA_DATABASE          = aws_athena_database.logs.name
       ATHENA_WORKGROUP         = aws_athena_workgroup.cd_quality_gate.name
       ATHENA_OUTPUT_LOCATION   = "s3://${aws_s3_bucket.analysis_results.bucket}/athena-results/"
+      BEDROCK_ENABLED          = tostring(var.bedrock_enabled)
+      BEDROCK_MODEL_ID         = var.bedrock_model_id
+      BEDROCK_REGION           = var.aws_region
+      BEDROCK_MAX_TOKENS       = tostring(var.bedrock_max_tokens)
       SLACK_CHANNEL            = "#cd-deploy-alarm"
       SLACK_WEBHOOK_SECRET_ARN = aws_secretsmanager_secret.slack_webhook_url.arn
     }

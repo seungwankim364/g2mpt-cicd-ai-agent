@@ -15,6 +15,7 @@ mkdir -p "$BUILD_DIR"
 
 cp "$LAMBDA_DIR/app.py" "$BUILD_DIR/app.py"
 cp "$LAMBDA_DIR/ai_agent_adapter.py" "$BUILD_DIR/ai_agent_adapter.py"
+cp "$LAMBDA_DIR/bedrock_agent.py" "$BUILD_DIR/bedrock_agent.py"
 
 mkdir -p "$BUILD_DIR/ai_agent"
 cp "$ROOT_DIR/ai-agent/app/analyzer.py" "$BUILD_DIR/ai_agent/analyzer.py"
@@ -40,6 +41,7 @@ find "$BUILD_DIR" -type f -name "*.pyc" -delete
 python3 -m py_compile \
   "$BUILD_DIR/app.py" \
   "$BUILD_DIR/ai_agent_adapter.py" \
+  "$BUILD_DIR/bedrock_agent.py" \
   "$BUILD_DIR/ai_agent/analyzer.py" \
   "$BUILD_DIR/ai_agent/runbook_loader.py" \
   "$BUILD_DIR/ai_agent/slack_message_builder.py"

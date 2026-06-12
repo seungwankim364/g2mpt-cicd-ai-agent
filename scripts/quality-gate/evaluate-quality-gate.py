@@ -17,6 +17,7 @@ def normalize_alert(raw_alert: dict) -> dict:
         "alertName": labels.get("alertname") or labels.get("alertName"),
         "service": labels.get("service"),
         "namespace": labels.get("namespace"),
+        "component": labels.get("component"),
         "severity": labels.get("severity", "unknown"),
         "state": raw_alert.get("state", "unknown"),
         "value": raw_alert.get("value"),
@@ -31,10 +32,17 @@ def main() -> int:
     parser.add_argument("--service", required=True)
     parser.add_argument("--namespace", required=True)
     parser.add_argument("--alert-names", required=True, help="Comma-separated alert names to evaluate.")
+    parser.add_argument(
+        "--monitored-namespaces",
+        default="",
+        help="Comma-separated namespaces allowed for service-adjacent infrastructure alerts.",
+    )
     parser.add_argument("--output-file", default="quality-gate-result.json")
     args = parser.parse_args()
 
     expected_alerts = {item.strip() for item in args.alert_names.split(",") if item.strip()}
+    monitored_namespaces = {args.namespace}
+    monitored_namespaces.update(item.strip() for item in args.monitored_namespaces.split(",") if item.strip())
     payload = load_json(args.alerts_file)
     raw_alerts = payload.get("data", {}).get("alerts", [])
     normalized = [normalize_alert(alert) for alert in raw_alerts]
@@ -45,15 +53,17 @@ def main() -> int:
             continue
         if alert["alertName"] not in expected_alerts:
             continue
-        if alert["service"] != args.service:
+        if alert["service"] and alert["service"] != args.service:
             continue
-        if alert["namespace"] != args.namespace:
+        if alert["namespace"] and alert["namespace"] not in monitored_namespaces:
             continue
         matched.append(alert)
 
     result = {
         "service": args.service,
         "namespace": args.namespace,
+        "monitoredNamespaces": sorted(monitored_namespaces),
+        "evaluatedAlertNames": sorted(expected_alerts),
         "status": "failed" if matched else "passed",
         "matchedAlertCount": len(matched),
         "matchedAlerts": matched,
@@ -73,4 +83,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

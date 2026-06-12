@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build Grafana links for Slack and quality gate outputs.")
     parser.add_argument("--base-url", required=True)
-    parser.add_argument("--dashboard-uid", required=True)
+    parser.add_argument("--dashboard-uid", action="append", required=True)
     parser.add_argument("--service", required=True)
     parser.add_argument("--namespace", required=True)
     parser.add_argument("--prometheus-url", default=os.environ.get("PROMETHEUS_URL", ""))
@@ -28,12 +28,16 @@ def main() -> int:
             "to": args.to_time,
         }
     )
-    dashboard_url = f"{args.base_url.rstrip('/')}/d/{args.dashboard_uid}?{query}"
+    dashboard_urls = {
+        dashboard_uid: f"{args.base_url.rstrip('/')}/d/{dashboard_uid}?{query}"
+        for dashboard_uid in args.dashboard_uid
+    }
     links = {
         "service": args.service,
         "namespace": args.namespace,
         "grafana": {
-            "dashboard": dashboard_url,
+            "dashboard": next(iter(dashboard_urls.values())),
+            "dashboards": dashboard_urls,
         },
     }
     if args.prometheus_url:

@@ -23,6 +23,35 @@ dashboards:
       gc: 18
       threads: 24
 
+  gpu-metrics:
+    uid: gpu-metrics
+    title: GPU Metrics Dashboard
+    variables:
+      namespace: posture-analysis
+    panels:
+      gpuUtilization: 12
+      gpuMemory: 18
+
+  redis-metrics:
+    uid: redis-metrics
+    title: Redis Metrics Dashboard
+    variables:
+      namespace: elasticache
+    panels:
+      connectedClients: 12
+      memory: 18
+      evictions: 24
+
+  sqs-metrics:
+    uid: sqs-metrics
+    title: SQS Metrics Dashboard
+    variables:
+      namespace: monitoring
+    panels:
+      backlog: 12
+      messageAge: 18
+      dlq: 24
+
   eks-overview:
     uid: eks-overview
     title: EKS Cluster Overview

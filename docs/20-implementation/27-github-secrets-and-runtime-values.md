@@ -86,6 +86,8 @@ Repository
 | `GITOPS_REPO` | `hj-3/gympt-gitops` | 기존 gympt-ops app CI/CD | 이 저장소의 필수 runtime 값이 아님 |
 | `GITHUB_TOKEN_SECRET_ARN` | unset | Terraform variable `github_token_secret_arn` | 승인 후 대상 GitHub workflow 자동 dispatch용 token secret |
 | `SLACK_WEBHOOK_SECRET_ARN` | Terraform resource `aws_secretsmanager_secret.slack_webhook_url.arn` | `lambda/analysis-orchestrator/app.py` | Lambda가 Slack 2차 알림 webhook을 Secrets Manager에서 조회 |
+| `BEDROCK_ENABLED` | `true` | Terraform variable `bedrock_enabled` | Lambda Orchestrator가 Bedrock 분석을 사용할지 결정 |
+| `BEDROCK_MODEL_ID` | `anthropic.claude-3-haiku-20240307-v1:0` | Terraform variable `bedrock_model_id` | Bedrock Runtime 호출 모델 |
 | `ROLLBACK_WORKFLOW_REPO` | unset | Terraform variable `rollback_workflow_repo` | rollback 승인 시 dispatch할 repository |
 | `DR_WORKFLOW_REPO` | unset | Terraform variable `dr_workflow_repo` | DR 승인 시 dispatch할 repository |
 | `APP_DEPLOY_WORKFLOW_REPO` | `hj-3/gympt-app` | Terraform variable `app_deploy_workflow_repo` | 조치 후 처음부터 다시 실행할 app 배포 workflow repository |
@@ -104,7 +106,7 @@ MVP에서는 코드에 고정된 값을 유지해도 된다. 여러 환경으로
 | `SLACK_WEBHOOK_URL` | GitHub Repository Secret | no | `#cd-deploy-alarm`에 테스트 알림 도착 |
 | `AWS_ROLE_ARN` | GitHub Repository Secret | no | `aws sts get-caller-identity` 성공 |
 | `cd-quality-gate/slack/webhook-url` | AWS Secrets Manager | no | Lambda가 Slack 2차 알림 전송 |
-| `cd-quality-gate/ai-agent/api-key` | AWS Secrets Manager | no | 외부 AI Agent endpoint 사용 시 인증 성공 |
+| Bedrock model access | AWS Bedrock console/IAM | no | Lambda가 Bedrock Runtime `InvokeModel` 성공 |
 
 ## 6. `GITOPS_PAT`
 
@@ -295,7 +297,7 @@ Lambda가 사용할 secret은 GitHub Secrets가 아니라 AWS Secrets Manager에
 | Secret name | 사용 주체 | 목적 |
 | --- | --- | --- |
 | `cd-quality-gate/slack/webhook-url` | Lambda Orchestrator | AI 분석 완료 후 Slack 2차 알림 전송 |
-| `cd-quality-gate/ai-agent/api-key` | Lambda Orchestrator | 외부 AI Agent endpoint 인증 |
+| Bedrock model access | Lambda Orchestrator | Bedrock Runtime 기반 AI 분석 |
 
 Terraform은 secret container만 만들고, 실제 값은 별도로 주입한다.
 

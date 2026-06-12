@@ -1253,6 +1253,110 @@ gympt-app 배포 workflow는 workflow_dispatch 입력을 받아야 한다.
 gympt-app 배포 workflow 마지막에는 cd-quality-gate-architecture의 quality-gate.yml 호출이 있어야 Slack 배포 완료 알림까지 이어진다.
 ```
 
+### 2026-06-12 10:12 - Amazon Bedrock AI 분석 연결
+
+작업:
+
+```text
+analysis-orchestrator Lambda에 Amazon Bedrock Runtime 호출 adapter를 추가했다.
+운영 기본값은 BEDROCK_ENABLED=true로 두고, Bedrock 호출 실패/비활성/boto3 미사용 환경에서는 기존 ai-agent rule analyzer로 fallback하도록 구성했다.
+Bedrock 응답은 JSON으로 강제하고, 기존 Slack 2차 승인 메시지 포맷으로 변환한다.
+Terraform에 Bedrock 관련 Lambda 환경변수와 bedrock:InvokeModel 권한을 추가했다.
+Lambda 패키징 스크립트가 bedrock_agent.py를 analysis-orchestrator.zip에 포함하도록 수정했다.
+```
+
+추가 파일:
+
+```text
+lambda/analysis-orchestrator/bedrock_agent.py
+```
+
+수정 파일:
+
+```text
+lambda/analysis-orchestrator/app.py
+scripts/lambda/package-analysis-orchestrator.sh
+infra/terraform/variables.tf
+infra/terraform/lambda.tf
+infra/terraform/iam.tf
+README.md
+docs/20-implementation/18-lambda-analysis-orchestrator-design.md
+docs/20-implementation/20-ai-agent-prompt-and-output-design.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+work-log.md
+```
+
+운영 전 확인:
+
+```text
+AWS Bedrock console에서 사용할 model access 활성화 필요
+Lambda role에 bedrock:InvokeModel 권한 필요
+기본 model id: anthropic.claude-3-haiku-20240307-v1:0
+비용 제어가 필요하면 terraform var.bedrock_enabled=false로 fallback 분석만 사용 가능
+```
+
+검증:
+
+```text
+scripts/test-local.sh 통과
+scripts/lambda/package-analysis-orchestrator.sh 통과
+build/analysis-orchestrator.zip에 bedrock_agent.py 포함 확인
+terraform -chdir=infra/terraform fmt -check 통과
+GitHub workflow YAML parse 통과
+```
+
+### 2026-06-12 10:07 - Quality Gate 평가 범위 확장
+
+작업:
+
+```text
+gympt-ops/gympt-gitops/platform/monitoring을 readonly reference로 확인했다.
+backend PrometheusRule뿐 아니라 infrastructure PrometheusRule의 SQS, Kubernetes, GPU, Redis, Bedrock alert도 5분 Health Check Window 평가 대상에 포함했다.
+evaluate-quality-gate.py가 backend-api service label만 엄격히 보는 구조에서 monitored namespace 기반 infrastructure alert도 평가할 수 있게 수정했다.
+Slack 1차 알림 Grafana 링크를 api-latency 단일 dashboard에서 api-latency, eks-overview, jvm-metrics, gpu-metrics, redis-metrics, sqs-metrics 다중 dashboard로 확장했다.
+```
+
+참고한 readonly 파일:
+
+```text
+../gympt-ops/gympt-gitops/platform/monitoring/rules/prometheusrule-backend.yaml
+../gympt-ops/gympt-gitops/platform/monitoring/rules/prometheusrule-infrastructure.yaml
+../gympt-ops/gympt-gitops/platform/monitoring/prometheusrule-infrastructure.yaml
+../gympt-ops/gympt-gitops/platform/monitoring/dashboard-api-latency.json
+../gympt-ops/gympt-gitops/platform/monitoring/dashboard-eks-overview.json
+../gympt-ops/gympt-gitops/platform/monitoring/dashboard-gpu-metrics.json
+../gympt-ops/gympt-gitops/platform/monitoring/dashboard-jvm-metrics.json
+../gympt-ops/gympt-gitops/platform/monitoring/dashboard-redis-metrics.json
+../gympt-ops/gympt-gitops/platform/monitoring/dashboard-sqs-metrics.json
+```
+
+수정 파일:
+
+```text
+.github/workflows/quality-gate.yml
+scripts/quality-gate/evaluate-quality-gate.py
+scripts/quality-gate/run-health-check-window.sh
+scripts/quality-gate/build-grafana-links.py
+scripts/quality-gate/send-slack-first-alert.py
+config/quality-gate/alert-mapping.yaml
+config/quality-gate/grafana-dashboards.yaml
+tests/fixtures/prometheus-alerts.firing.json
+scripts/test-local.sh
+README.md
+docs/10-architecture/07-quality-gate-rules.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+work-log.md
+```
+
+검증:
+
+```text
+scripts/test-local.sh 통과
+firing fixture에서 BackendHighErrorRate, BackendHighLatency, BackendDBPoolExhaustion, SQSMessageAge, RedisConnectionError, GPUMemoryHigh 총 6개 alert matched 확인
+grafana-links.json에 api-latency, eks-overview, jvm-metrics, gpu-metrics, redis-metrics, sqs-metrics 포함 확인
+```
+
 ### 2026-06-11 17:18 - Runtime flow 대조 및 누락 보정
 
 작업:

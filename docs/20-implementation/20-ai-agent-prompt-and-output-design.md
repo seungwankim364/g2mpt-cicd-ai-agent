@@ -2,7 +2,7 @@
 
 ## 1. 목적
 
-AI Agent가 배포 실패 원인 후보와 대응 방안을 일관된 형식으로 생성하도록 입력, prompt, 출력 schema를 정의한다.
+Amazon Bedrock 기반 AI Agent가 배포 실패 원인 후보와 대응 방안을 일관된 형식으로 생성하도록 입력, prompt, 출력 schema를 정의한다.
 
 AI Agent는 운영자를 대신해 자동 조치를 실행하지 않는다. 분석 결과와 추천 조치를 제공하고, 최종 실행은 운영자 승인 이후 별도 workflow에서 수행한다.
 
@@ -15,6 +15,24 @@ Runbook 매칭
 원인 후보 정리
 추천 조치 선택
 Slack 2차 알림용 메시지 생성
+```
+
+운영 기본 실행 경로:
+
+```text
+lambda/analysis-orchestrator/app.py
+  -> lambda/analysis-orchestrator/bedrock_agent.py
+  -> Amazon Bedrock Runtime invoke_model
+  -> ai-agent/app/slack_message_builder.py
+```
+
+fallback 실행 경로:
+
+```text
+Bedrock 비활성/실패
+  -> lambda/analysis-orchestrator/ai_agent_adapter.py
+  -> ai-agent/app/analyzer.py
+  -> ai-agent/app/slack_message_builder.py
 ```
 
 ## 3. 입력 데이터
@@ -196,4 +214,3 @@ Runbook 매칭 실패 시 기본 분석 prompt 사용
 Slack message가 1분 내 읽을 수 있는 길이로 생성
 recommendedAction.requiresApproval이 항상 true로 설정
 ```
-

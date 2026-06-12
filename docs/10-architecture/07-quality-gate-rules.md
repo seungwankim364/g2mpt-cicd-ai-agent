@@ -54,6 +54,62 @@ Inspector Finding 증가
 S3 Access Denied 증가
 ```
 
+## 5.1 현재 PrometheusRule 연동 기준
+
+`gympt-ops/gympt-gitops/platform/monitoring`을 readonly reference로 보고, 현재 Quality Gate는 아래 alert를 5분 Health Check Window에서 함께 평가한다.
+
+Backend:
+
+```text
+BackendHighErrorRate
+BackendHighLatency
+BackendPodRestarting
+BackendDBPoolExhaustion
+BackendHighMemoryUsage
+```
+
+Kubernetes / SQS:
+
+```text
+NodeHighCPUUsage
+PodRestartFrequent
+SQSQueueBacklog
+SQSMessageAge
+SQSDLQMessages
+```
+
+GPU / Redis / Bedrock:
+
+```text
+GPUHighUtilization
+GPUMemoryHigh
+RedisConnectionError
+RedisHighMemory
+RedisHighEvictionRate
+BedrockHighErrorRate
+BedrockThrottling
+```
+
+연관 namespace:
+
+```text
+gympt-prod
+monitoring
+posture-analysis
+elasticache
+```
+
+Slack 1차 알림에는 아래 Grafana dashboard 링크를 함께 넣는다.
+
+```text
+api-latency
+eks-overview
+jvm-metrics
+gpu-metrics
+redis-metrics
+sqs-metrics
+```
+
 ## 6. 대응 판단 기준
 
 ### Rollback 권장 상황
@@ -112,4 +168,3 @@ AWS 리전 장애
 백업 복구
 인프라 재생성
 ```
-

@@ -44,6 +44,48 @@
         "state": "firing",
         "activeAt": "2026-06-09T08:20:00Z",
         "value": "0.93"
+      },
+      {
+        "labels": {
+          "alertname": "SQSMessageAge",
+          "namespace": "monitoring",
+          "component": "sqs",
+          "severity": "critical"
+        },
+        "annotations": {
+          "summary": "SQS queue has old messages"
+        },
+        "state": "firing",
+        "activeAt": "2026-06-09T08:21:00Z",
+        "value": "2400"
+      },
+      {
+        "labels": {
+          "alertname": "RedisConnectionError",
+          "namespace": "elasticache",
+          "component": "redis",
+          "severity": "critical"
+        },
+        "annotations": {
+          "summary": "Redis has no connected clients"
+        },
+        "state": "firing",
+        "activeAt": "2026-06-09T08:22:00Z",
+        "value": "0"
+      },
+      {
+        "labels": {
+          "alertname": "GPUMemoryHigh",
+          "namespace": "posture-analysis",
+          "component": "gpu",
+          "severity": "critical"
+        },
+        "annotations": {
+          "summary": "GPU memory usage is high"
+        },
+        "state": "firing",
+        "activeAt": "2026-06-09T08:23:00Z",
+        "value": "0.95"
       }
     ]
   }

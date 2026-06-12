@@ -4,7 +4,7 @@
 
 배포 실패 이벤트가 발생했을 때 분석 파이프라인을 시작하는 Lambda Orchestrator를 설계한다.
 
-이 Lambda는 EventBridge에서 `DeploymentFailed` 이벤트를 수신하고, Athena 로그 분석을 실행한 뒤, 분석 결과를 S3에 저장하고 AI Agent와 Slack 알림으로 연결한다.
+이 Lambda는 EventBridge에서 `DeploymentFailed` 이벤트를 수신하고, Athena 로그 분석을 실행한 뒤, 분석 결과를 S3에 저장하고 Amazon Bedrock 기반 AI 분석과 Slack 알림으로 연결한다.
 
 ## 2. 역할
 
@@ -13,11 +13,11 @@ EventBridge event validation
 Athena query orchestration
 Analysis summary generation
 S3 result persistence
-AI Agent invocation
+Amazon Bedrock invocation
 Slack 2nd alert trigger
 ```
 
-Lambda는 장애 분석의 중심 실행자이지만, 원인 판단 자체를 직접 수행하지 않는다. 원인 판단은 Athena summary와 Runbook을 입력받은 AI Agent가 담당한다.
+Lambda는 장애 분석의 중심 실행자이지만, 원인 판단 자체를 직접 수행하지 않는다. 원인 판단은 Athena summary와 Runbook을 입력받은 Bedrock 모델이 담당하고, Bedrock이 비활성화되거나 실패하면 local `ai-agent` rule analyzer로 fallback한다.
 
 ## 3. 입력 이벤트
 
@@ -78,7 +78,7 @@ argocdUrl
 8. Athena 결과 수집 또는 pending 상태 저장
 9. summary JSON 생성
 10. S3 deployment-failures 경로에 저장
-11. AI Agent 호출
+11. Bedrock AI 분석 호출
 12. Slack 2차 알림 전송
 ```
 
@@ -94,6 +94,7 @@ collect_athena_results(query_execution_ids)
 build_athena_summary(context, query_results)
 write_summary_to_s3(summary)
 invoke_ai_agent(summary)
+bedrock_agent.analyze_with_bedrock(summary)
 send_second_slack_alert(ai_result)
 ```
 
@@ -184,7 +185,7 @@ failed
 | Athena query 시작 실패 | 재시도 후 failed |
 | Athena query timeout | partial summary 생성 |
 | S3 저장 실패 | Lambda error 발생, 재시도 유도 |
-| AI Agent 호출 실패 | Athena summary 링크만 Slack 전송 |
+| Bedrock 호출 실패 | local ai-agent fallback으로 분석 후 Slack 전송 |
 | Slack 2차 알림 실패 | status completed_with_notification_error |
 
 ## 11. Timeout 기준
@@ -194,7 +195,7 @@ failed
 ```text
 Lambda timeout: 5 minutes
 Athena query wait: 2 minutes
-AI Agent call timeout: 30 seconds
+Bedrock call timeout: Lambda/boto3 client timeout 기준
 ```
 
 Athena query가 길어질 경우 Lambda 한 번에서 모두 기다리지 않고, Step Functions 또는 재호출 방식으로 분리할 수 있다.
@@ -209,11 +210,15 @@ ATHENA_DATABASE
 ATHENA_WORKGROUP
 ATHENA_OUTPUT_LOCATION
 AI_AGENT_ENDPOINT
+BEDROCK_ENABLED
+BEDROCK_MODEL_ID
+BEDROCK_REGION
+BEDROCK_MAX_TOKENS
 SLACK_WEBHOOK_URL
 QUERY_TEMPLATE_PREFIX
 ```
 
-Slack webhook과 AI Agent 인증 정보는 Secrets Manager 또는 GitHub Actions secret이 아닌 AWS Secrets Manager에 저장하는 것을 권장한다.
+Slack webhook은 AWS Secrets Manager에 저장한다. Bedrock은 API key가 아니라 Lambda IAM role의 `bedrock:InvokeModel` 권한과 AWS 계정의 model access 설정을 사용한다.
 
 ## 13. 관측 지표
 
@@ -237,4 +242,3 @@ S3 경로는 deploymentId 기준으로 deterministic하게 생성
 Slack에는 민감한 로그 원문을 직접 포함하지 않음
 AI Agent 실패가 전체 분석 실패로 이어지지 않도록 분리
 ```
-

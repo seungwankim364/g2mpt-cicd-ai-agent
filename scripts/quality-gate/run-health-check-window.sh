@@ -4,6 +4,7 @@ set -euo pipefail
 SERVICE_NAME="${SERVICE_NAME:-backend-api}"
 NAMESPACE="${NAMESPACE:-gympt-prod}"
 ALERT_NAMES="${ALERT_NAMES:-BackendHighErrorRate,BackendHighLatency,BackendPodRestarting}"
+MONITORED_NAMESPACES="${MONITORED_NAMESPACES:-$NAMESPACE}"
 OUTPUT_DIR="${OUTPUT_DIR:-.}"
 WINDOW_SECONDS="${HEALTH_CHECK_WINDOW_SECONDS:-300}"
 INTERVAL_SECONDS="${HEALTH_CHECK_INTERVAL_SECONDS:-60}"
@@ -49,6 +50,7 @@ for sample in $(seq 1 "$sample_count"); do
     --service "$SERVICE_NAME" \
     --namespace "$NAMESPACE" \
     --alert-names "$ALERT_NAMES" \
+    --monitored-namespaces "$MONITORED_NAMESPACES" \
     --output-file "$result_file"; then
     sample_status="passed"
   else

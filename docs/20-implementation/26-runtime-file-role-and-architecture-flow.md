@@ -34,7 +34,8 @@ Developer 또는 운영자
   -> lambda/analysis-orchestrator/app.py
   -> athena/templates/backend-api.json
   -> athena/queries/*.sql
-  -> ai-agent/app/main.py 또는 ai-agent/app/analyzer.py
+  -> lambda/analysis-orchestrator/bedrock_agent.py
+  -> fallback이면 ai-agent/app/analyzer.py
   -> ai-agent/app/slack_message_builder.py
   -> Slack #cd-deploy-alarm 2차 분석/승인 알림
 ```
@@ -90,6 +91,32 @@ cd-quality-gate-runtime
         script: scripts/quality-gate/run-health-check-window.sh
         duration: 300s
         interval: 60s
+        monitoredNamespaces:
+          - gympt-prod
+          - monitoring
+          - posture-analysis
+          - elasticache
+        evaluatedAlertGroups:
+          backend:
+            - BackendHighErrorRate
+            - BackendHighLatency
+            - BackendPodRestarting
+            - BackendDBPoolExhaustion
+            - BackendHighMemoryUsage
+          kubernetesAndSqs:
+            - NodeHighCPUUsage
+            - PodRestartFrequent
+            - SQSQueueBacklog
+            - SQSMessageAge
+            - SQSDLQMessages
+          gpuRedisBedrock:
+            - GPUHighUtilization
+            - GPUMemoryHigh
+            - RedisConnectionError
+            - RedisHighMemory
+            - RedisHighEvictionRate
+            - BedrockHighErrorRate
+            - BedrockThrottling
         output: quality-gate-window-result.json
       query-alerts:
         script: scripts/quality-gate/query-prometheus-alerts.sh
@@ -103,6 +130,13 @@ cd-quality-gate-runtime
       input: prometheus-alerts-<sample>.json
       output: quality-gate-result-<sample>.json
       aggregate-output: quality-gate-result.json
+      dashboard-links:
+        - api-latency
+        - eks-overview
+        - jvm-metrics
+        - gpu-metrics
+        - redis-metrics
+        - sqs-metrics
       pass:
         script: scripts/quality-gate/send-slack-deploy-success.py
         output: slack-deploy-success.json
@@ -117,8 +151,10 @@ cd-quality-gate-runtime
     lambda: lambda/analysis-orchestrator/app.py
     athena-template: athena/templates/backend-api.json
     athena-queries: athena/queries/*.sql
-    ai-agent:
-      analyzer: ai-agent/app/analyzer.py
+    ai-analysis:
+      bedrock-adapter: lambda/analysis-orchestrator/bedrock_agent.py
+      model-id: anthropic.claude-3-haiku-20240307-v1:0
+      fallback-analyzer: ai-agent/app/analyzer.py
       runbook-loader: ai-agent/app/runbook_loader.py
       slack-builder: ai-agent/app/slack_message_builder.py
     output:
@@ -151,11 +187,12 @@ cd-quality-gate-runtime
 | Deployment action executor | `lambda/deployment-action-executor/app.py` | 승인 이벤트를 받아 rollback/DR/manual fix/change workflow를 자동 dispatch |
 | EventBridge bus/rule | `infra/terraform/eventbridge.tf` | 전용 bus와 `DeploymentFailed` rule 정의 |
 | Lambda target | `infra/terraform/lambda.tf` | EventBridge 이후 실행될 Lambda와 환경변수 정의 |
-| Lambda package | `scripts/lambda/package-analysis-orchestrator.sh` | Terraform이 참조하는 `build/analysis-orchestrator.zip` 생성. `ai-agent`, runbook, Athena query 포함 |
+| Lambda package | `scripts/lambda/package-analysis-orchestrator.sh` | Terraform이 참조하는 `build/analysis-orchestrator.zip` 생성. Bedrock adapter, `ai-agent` fallback, runbook, Athena query 포함 |
 | Lambda Orchestrator | `lambda/analysis-orchestrator/app.py` | 이벤트 수신, Athena query 실행, summary 생성, AI Agent 호출, Slack 2차 알림 전송 |
 | Athena query template | `athena/templates/backend-api.json` | backend-api 실패 시 실행할 SQL 목록 정의 |
 | Athena SQL | `athena/queries/*.sql` | ALB, application, WAF 등 로그 분석 query |
-| AI Agent | `ai-agent/app/analyzer.py` | alert와 Athena signal을 읽고 원인 후보, 심각도, 추천 조치 생성 |
+| Bedrock AI analysis | `lambda/analysis-orchestrator/bedrock_agent.py` | alert와 Athena summary를 Bedrock 모델에 전달하고 원인 후보, 심각도, 추천 조치를 JSON으로 생성 |
+| Local AI fallback | `ai-agent/app/analyzer.py` | Bedrock 비활성/실패 시 alert와 Athena signal을 읽고 rule 기반 추천 조치 생성 |
 | AI Slack message | `ai-agent/app/slack_message_builder.py` | AI 분석 결과를 Slack 2차 알림 구조로 변환 |
 | Runbook | `scripts/runbooks/*.sh` | alert별 사람이 확인할 운영 명령과 절차 |
 | Local test | `scripts/test-local.sh` | 위 흐름을 fixture 기반으로 로컬에서 한 번에 검증 |
@@ -215,7 +252,8 @@ SERVICE_NAME=backend-api
 ENVIRONMENT=prod
 NAMESPACE=gympt-prod
 DEPLOYMENT=backend-api-prod
-ALERT_NAMES=BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
+ALERT_NAMES=BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage,SQSQueueBacklog,SQSMessageAge,SQSDLQMessages,NodeHighCPUUsage,PodRestartFrequent,GPUHighUtilization,GPUMemoryHigh,RedisConnectionError,RedisHighMemory,RedisHighEvictionRate,BedrockHighErrorRate,BedrockThrottling
+MONITORED_NAMESPACES=gympt-prod,monitoring,posture-analysis,elasticache
 EVENT_BUS_NAME=cd-quality-gate-prod-bus
 SLACK_CHANNEL=#cd-deploy-alarm
 ```
@@ -439,7 +477,8 @@ prometheus-alerts.json
 ```text
 --service backend-api
 --namespace gympt-prod
---alert-names BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
+--alert-names BackendHighErrorRate,...,BedrockThrottling
+--monitored-namespaces gympt-prod,monitoring,posture-analysis,elasticache
 --output-file quality-gate-result.json
 ```
 
@@ -448,8 +487,8 @@ prometheus-alerts.json
 ```text
 1. alert state가 firing인지 확인
 2. alert name이 평가 대상 목록에 있는지 확인
-3. service label이 backend-api인지 확인
-4. namespace label이 gympt-prod인지 확인
+3. service label이 있으면 backend-api와 일치하는지 확인
+4. namespace label이 있으면 monitored namespace 목록에 포함되는지 확인
 5. 하나라도 매칭되면 failed
 6. 매칭되는 firing alert가 없으면 passed
 ```
@@ -475,6 +514,11 @@ Slack 알림에 넣을 Grafana dashboard link를 만든다.
 ```text
 base-url=https://grafana.g2mpt.com
 dashboard-uid=api-latency
+dashboard-uid=eks-overview
+dashboard-uid=jvm-metrics
+dashboard-uid=gpu-metrics
+dashboard-uid=redis-metrics
+dashboard-uid=sqs-metrics
 service=backend-api
 namespace=gympt-prod
 ```
@@ -675,18 +719,48 @@ failedAt
 5. wait_or_collect_query_results()로 query 결과 상태 수집
 6. build_summary()로 athena-summary 구조 생성
 7. write_summary_to_s3()로 S3 또는 local path에 summary 저장
-8. invoke_ai_agent()로 AI Agent 호출
+8. invoke_ai_agent()로 Bedrock AI 분석 호출
 9. send_second_slack_alert()로 Secrets Manager의 Slack webhook을 읽고 Slack 2차 알림 전송
 ```
 
 아키텍처 흐름도에서는 `Lambda analysis orchestrator` 박스의 중심 파일이다.
+
+### `lambda/analysis-orchestrator/bedrock_agent.py`
+
+역할:
+
+```text
+Athena summary와 Prometheus alert를 Amazon Bedrock 모델에 전달해 원인 후보와 추천 조치를 JSON으로 생성한다.
+```
+
+읽는 값:
+
+```text
+BEDROCK_ENABLED
+BEDROCK_MODEL_ID
+BEDROCK_REGION
+BEDROCK_MAX_TOKENS
+```
+
+출력:
+
+```text
+aiResult.analysisEngine=bedrock
+aiResult.slackPayload
+```
+
+주의:
+
+```text
+Bedrock 호출 실패, 권한 부족, 모델 access 미설정 시 app.py가 local ai-agent fallback으로 전환한다.
+```
 
 ### `lambda/analysis-orchestrator/ai_agent_adapter.py`
 
 역할:
 
 ```text
-AI Agent endpoint가 없을 때 Lambda 로컬 실행용 분석 결과를 만든다.
+Bedrock이 비활성화되었거나 실패했을 때 Lambda 로컬 실행용 fallback 분석 결과를 만든다.
 ```
 
 사용 위치:
@@ -972,7 +1046,7 @@ schemas/rollback/rollback-request.schema.json
 | values file | `charts/backend-api/values-prod.yaml` |
 | ECR image | `337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api` |
 | Grafana | `https://grafana.g2mpt.com` |
-| main dashboard UID | `api-latency` |
+| Grafana dashboard UID | `api-latency`, `eks-overview`, `jvm-metrics`, `gpu-metrics`, `redis-metrics`, `sqs-metrics` |
 | EventBridge bus | `cd-quality-gate-prod-bus` |
 | Slack channel | `#cd-deploy-alarm` |
 | AWS region | `ap-northeast-2` |

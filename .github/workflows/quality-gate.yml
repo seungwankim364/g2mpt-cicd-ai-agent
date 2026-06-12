@@ -49,7 +49,8 @@ jobs:
       NAMESPACE: ${{ inputs.namespace }}
       DEPLOYMENT: ${{ inputs.deployment }}
       IMAGE_TAG: ${{ inputs.image_tag }}
-      ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage
+      ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage,SQSQueueBacklog,SQSMessageAge,SQSDLQMessages,NodeHighCPUUsage,PodRestartFrequent,GPUHighUtilization,GPUMemoryHigh,RedisConnectionError,RedisHighMemory,RedisHighEvictionRate,BedrockHighErrorRate,BedrockThrottling
+      MONITORED_NAMESPACES: gympt-prod,monitoring,posture-analysis,elasticache
       PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       EVENT_BUS_NAME: cd-quality-gate-prod-bus
@@ -89,6 +90,11 @@ jobs:
           scripts/quality-gate/build-grafana-links.py \
             --base-url "https://grafana.g2mpt.com" \
             --dashboard-uid "api-latency" \
+            --dashboard-uid "eks-overview" \
+            --dashboard-uid "jvm-metrics" \
+            --dashboard-uid "gpu-metrics" \
+            --dashboard-uid "redis-metrics" \
+            --dashboard-uid "sqs-metrics" \
             --service "$SERVICE_NAME" \
             --namespace "$NAMESPACE" \
             --prometheus-url "$PROMETHEUS_URL" \

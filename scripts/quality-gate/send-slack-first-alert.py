@@ -24,9 +24,13 @@ def build_message(result: dict, links: dict, github_run_url: str | None) -> dict
         alert_lines.append("- No matching alert details found.")
 
     link_lines = []
-    grafana_url = links.get("grafana", {}).get("dashboard")
-    if grafana_url:
-        link_lines.append(f"Grafana: {grafana_url}")
+    grafana = links.get("grafana", {})
+    grafana_dashboards = grafana.get("dashboards", {})
+    if grafana_dashboards:
+        for name, url in grafana_dashboards.items():
+            link_lines.append(f"Grafana {name}: {url}")
+    elif grafana.get("dashboard"):
+        link_lines.append(f"Grafana: {grafana['dashboard']}")
     prometheus_url = links.get("prometheus", {}).get("alerts")
     if prometheus_url:
         link_lines.append(f"Prometheus Alerts: {prometheus_url}")

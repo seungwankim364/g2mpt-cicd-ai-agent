@@ -45,6 +45,23 @@ variable "github_token_secret_arn" {
   default = ""
 }
 
+variable "bedrock_enabled" {
+  type        = bool
+  default     = true
+  description = "Use Amazon Bedrock for AI incident analysis. Local rule-based ai-agent remains the fallback."
+}
+
+variable "bedrock_model_id" {
+  type        = string
+  default     = "anthropic.claude-3-haiku-20240307-v1:0"
+  description = "Amazon Bedrock model id used by the analysis orchestrator."
+}
+
+variable "bedrock_max_tokens" {
+  type    = number
+  default = 1200
+}
+
 variable "rollback_workflow_repo" {
   type    = string
   default = "seungwankim364/g2mpt-cicd-ai-agent"

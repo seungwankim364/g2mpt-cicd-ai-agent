@@ -41,7 +41,7 @@ Existing gympt-ops CI/CD
   -> EventBridge DeploymentFailed 이벤트
   -> Lambda Orchestrator
   -> Athena 로그 분석
-  -> AI Agent 원인 분석
+  -> Amazon Bedrock 기반 AI 원인 분석
   -> Slack 2차 알림
   -> 운영자 승인 기반 rollback 또는 manual fix
 ```
@@ -70,10 +70,11 @@ Existing gympt-ops CI/CD
 | DR 요청 workflow | [.github/workflows/dr-failover.yml](.github/workflows/dr-failover.yml) | 승인 후 기존 권한 보유 repo의 DR failover workflow를 자동 호출 |
 | Manual fix workflow | [.github/workflows/manual-fix.yml](.github/workflows/manual-fix.yml) | 승인 후 수동 조치 이슈와 실행 기록 생성 |
 | Change apply workflow | [.github/workflows/change-apply.yml](.github/workflows/change-apply.yml) | 승인 후 change 실행 기록과 이슈 생성 |
-| Lambda 패키징 | [scripts/lambda/package-analysis-orchestrator.sh](scripts/lambda/package-analysis-orchestrator.sh) | Terraform apply 전 `ai-agent`, runbook, Athena query를 포함한 `build/analysis-orchestrator.zip` 생성 |
+| Lambda 패키징 | [scripts/lambda/package-analysis-orchestrator.sh](scripts/lambda/package-analysis-orchestrator.sh) | Terraform apply 전 Bedrock adapter, `ai-agent` fallback, runbook, Athena query를 포함한 zip 생성 |
 | Runbook | [scripts/runbooks](scripts/runbooks) | alert별 운영 확인 스크립트 |
 | Lambda Orchestrator | [lambda/analysis-orchestrator](lambda/analysis-orchestrator) | EventBridge 이후 Athena/AI/Slack 분석 오케스트레이션 |
-| AI Agent | [ai-agent](ai-agent) | Athena summary와 alert를 바탕으로 원인 후보와 조치 추천 생성 |
+| Bedrock AI 분석 | [lambda/analysis-orchestrator/bedrock_agent.py](lambda/analysis-orchestrator/bedrock_agent.py) | Athena summary와 alert를 Bedrock 모델에 전달해 원인 후보와 조치 추천 생성 |
+| Local AI fallback | [ai-agent](ai-agent) | Bedrock 비활성/실패 시 rule 기반 원인 후보와 조치 추천 생성 |
 | Athena | [athena](athena) | query, query template, external table schema |
 | Infra | [infra](infra) | Terraform 기준 AWS 리소스 scaffold |
 | Schema | [schemas](schemas) | EventBridge, AI, Slack, rollback JSON schema |
@@ -95,6 +96,20 @@ Existing gympt-ops CI/CD
 | Infra 관리 | Terraform 기준 |
 | 비용 태그 | `Project=cd-quality-gate`, `Environment=dev/prod`, `CostControl=auto-stop` |
 | 알림 종류 | 배포 완료, CD 실패 1차 알림, AI 분석/rollback/DR/change 승인 알림 |
+| AI 분석 엔진 | 운영 기본값은 Amazon Bedrock, local fallback은 `ai-agent` rule analyzer |
+
+Quality Gate는 backend-api alert만 보지 않는다. `gympt-ops/gympt-gitops/platform/monitoring`의 PrometheusRule과 dashboard를 기준으로 backend, Kubernetes, SQS, GPU, Redis, Bedrock 관련 alert를 5분 window에서 함께 평가한다.
+
+평가 dashboard:
+
+```text
+api-latency
+eks-overview
+jvm-metrics
+gpu-metrics
+redis-metrics
+sqs-metrics
+```
 
 Slack 2차 알림의 승인 버튼을 누르면 API Gateway가 `slack-approval-handler`를 호출하고, `DeploymentActionApproved` 이벤트를 거쳐 `deployment-action-executor`가 action type별 GitHub workflow를 자동 실행한다. 실제 rollback/DR 동작은 Terraform 변수에 지정한 대상 repository workflow가 수행한다.
 
@@ -106,43 +121,13 @@ ServiceMonitor 정합성 확인 결과, 기존 `platform/monitoring/servicemonit
 
 ## 로컬에서 빠르게 확인
 
-정상 fixture로 Quality Gate pass 확인:
-
-```bash
-FIXTURE_FILE=tests/fixtures/prometheus-alerts.normal.json \
-OUTPUT_FILE=/tmp/quality-gate-alerts-normal.json \
-scripts/quality-gate/query-prometheus-alerts.sh
-
-scripts/quality-gate/evaluate-quality-gate.py \
-  --alerts-file /tmp/quality-gate-alerts-normal.json \
-  --service backend-api \
-  --namespace prod \
-  --alert-names BackendHighErrorRate,BackendHighLatency,BackendPodRestarting \
-  --output-file /tmp/quality-gate-result-normal.json
-```
-
-실패 fixture로 Quality Gate fail 확인:
-
-```bash
-FIXTURE_FILE=tests/fixtures/prometheus-alerts.firing.json \
-OUTPUT_FILE=/tmp/quality-gate-alerts-firing.json \
-scripts/quality-gate/query-prometheus-alerts.sh
-
-scripts/quality-gate/evaluate-quality-gate.py \
-  --alerts-file /tmp/quality-gate-alerts-firing.json \
-  --service backend-api \
-  --namespace prod \
-  --alert-names BackendHighErrorRate,BackendHighLatency,BackendPodRestarting \
-  --output-file /tmp/quality-gate-result-firing.json
-```
-
-실패 시 exit code는 `1`이다. GitHub Actions에서는 이 값을 이용해 CD job을 실패 처리한다.
-
 한 번에 전체 로컬 검증:
 
 ```bash
 scripts/test-local.sh
 ```
+
+이 테스트는 backend alert뿐 아니라 SQS, Redis, GPU fixture alert도 Quality Gate에서 잡히는지 확인한다.
 
 ## 퇴근 전 AWS 비용 절감
 
