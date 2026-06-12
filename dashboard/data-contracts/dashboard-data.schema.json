@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cd-quality-gate.local/dashboard-data.schema.json",
+  "title": "CD Quality Gate Dashboard Data",
+  "type": "object",
+  "required": [
+    "deployment",
+    "timeline",
+    "healthWindow",
+    "alertGroups",
+    "links",
+    "analysis",
+    "approvals",
+    "infra"
+  ],
+  "properties": {
+    "mode": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "deployment": {
+      "type": "object",
+      "required": ["id", "service", "environment", "namespace", "imageTag", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "service": { "type": "string" },
+        "environment": { "type": "string" },
+        "namespace": { "type": "string" },
+        "imageTag": { "type": "string" },
+        "rollbackImageTag": { "type": "string" },
+        "commitSha": { "type": "string" },
+        "branch": { "type": "string" },
+        "repository": { "type": "string" },
+        "argocdApp": { "type": "string" },
+        "status": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "lastUpdatedAt": { "type": "string" }
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "owner", "status", "detail"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "owner": { "type": "string" },
+          "status": { "type": "string" },
+          "at": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "healthWindow": {
+      "type": "object",
+      "required": ["durationSeconds", "intervalSeconds", "result", "samples", "metrics"],
+      "properties": {
+        "durationSeconds": { "type": "number" },
+        "intervalSeconds": { "type": "number" },
+        "result": { "type": "string" },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["sample", "at", "result", "alerts"],
+            "properties": {
+              "sample": { "type": "number" },
+              "at": { "type": "string" },
+              "result": { "type": "string" },
+              "alerts": { "type": "number" },
+              "latencyMs": { "type": "number" }
+            }
+          }
+        },
+        "metrics": { "type": "object" }
+      }
+    },
+    "alertGroups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "severity", "count", "alerts"],
+        "properties": {
+          "name": { "type": "string" },
+          "severity": { "type": "string" },
+          "count": { "type": "number" },
+          "dashboards": { "type": "array", "items": { "type": "string" } },
+          "alerts": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    },
+    "links": { "type": "object" },
+    "analysis": {
+      "type": "object",
+      "required": ["engine", "model", "confidence", "recommendedAction", "summary"],
+      "properties": {
+        "engine": { "type": "string" },
+        "model": { "type": "string" },
+        "confidence": { "type": "number" },
+        "recommendedAction": { "type": "string" },
+        "severity": { "type": "string" },
+        "summary": { "type": "string" },
+        "causeCandidates": { "type": "array", "items": { "type": "object" } },
+        "nextSteps": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "approvals": { "type": "array", "items": { "type": "object" } },
+    "infra": {
+      "type": "object",
+      "required": ["terraformState", "resources", "checklist"],
+      "properties": {
+        "terraformState": { "type": "string" },
+        "lastApply": { "type": "string" },
+        "lastDestroy": { "type": "string" },
+        "resources": { "type": "array", "items": { "type": "object" } },
+        "checklist": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  }
+}

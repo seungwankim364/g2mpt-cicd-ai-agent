@@ -1364,6 +1364,59 @@ Slack App Interactivity Request URL은 Terraform apply 후 새 slack_interactivi
 EKS/Prometheus/backend-api-prod가 살아난 뒤에만 실제 E2E 테스트가 가능하다.
 ```
 
+### 2026-06-12 16:49 - CD Quality Gate Control Center 대시보드 추가
+
+작업:
+
+```text
+CD Quality Gate 운영 흐름을 한 화면에서 추적하는 dashboard/ 정적 운영 콘솔을 추가했다.
+AWS 리소스가 꺼져 있어도 demo fixture로 Deployment Timeline, Quality Gate Health, Alert Coverage, AI Incident Analysis, Approval & Action, Infra & Cost 상태를 볼 수 있게 구성했다.
+나중에 API Gateway/S3/GitHub Actions/Prometheus를 붙일 수 있도록 demo/live adapter 경계를 dashboard/src/data/loadDashboardData.js로 분리했다.
+dashboard/dashboard-data.json을 두고 ?mode=live로 열면 live data를 읽도록 준비했다.
+dashboard data contract를 JSON Schema로 문서화했다.
+scripts/test-local.sh에 dashboard JavaScript syntax와 schema JSON 검증을 추가했다.
+README와 repository architecture 문서에 dashboard 영역을 추가했다.
+```
+
+추가 파일:
+
+```text
+dashboard/README.md
+dashboard/index.html
+dashboard/src/main.js
+dashboard/src/styles.css
+dashboard/src/data/loadDashboardData.js
+dashboard/src/data/sample-dashboard.js
+dashboard/data-contracts/dashboard-data.schema.json
+```
+
+수정 파일:
+
+```text
+README.md
+docs/90-reference/13-repository-architecture.md
+scripts/test-local.sh
+work-log.md
+```
+
+검증:
+
+```text
+node --check dashboard/src/main.js 통과
+node --check dashboard/src/data/loadDashboardData.js 통과
+node --check dashboard/src/data/sample-dashboard.js 통과
+python3 -m json.tool dashboard/data-contracts/dashboard-data.schema.json 통과
+scripts/test-local.sh 통과
+```
+
+실행:
+
+```text
+python3 -m http.server 5173 --directory dashboard
+http://localhost:5173
+http://localhost:5173?mode=live
+```
+
 ### 2026-06-12 15:00 - Terraform 기반 AWS 리소스 생성 및 6개 체크리스트 테스트
 
 작업:

@@ -78,6 +78,7 @@ Existing gympt-ops CI/CD
 | Athena | [athena](athena) | query, query template, external table schema |
 | Infra | [infra](infra) | Terraform 기준 AWS 리소스 scaffold |
 | Schema | [schemas](schemas) | EventBridge, AI, Slack, rollback JSON schema |
+| Dashboard | [dashboard](dashboard) | CD Quality Gate 운영 콘솔, demo/live adapter, dashboard data contract |
 | AWS 비용 절감 | [scripts/aws/destroy-terraform-stack.sh](scripts/aws/destroy-terraform-stack.sh) | 퇴근 전 Terraform stack destroy |
 | 로컬 통합 테스트 | [scripts/test-local.sh](scripts/test-local.sh) | fixture 기반 전체 흐름 검증 |
 

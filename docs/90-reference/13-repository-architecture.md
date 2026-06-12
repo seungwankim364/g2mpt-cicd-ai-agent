@@ -13,6 +13,17 @@
 cd-quality-gate-architecture/
   README.md
   cd-quality-gate-ai-incident-analysis.drawio
+  dashboard/
+    README.md
+    index.html
+    data-contracts/
+      dashboard-data.schema.json
+    src/
+      main.js
+      styles.css
+      data/
+        loadDashboardData.js
+        sample-dashboard.js
   docs/
     README.md
     00-overview/
@@ -45,6 +56,7 @@ cd-quality-gate-architecture/
       25-rollback-workflow-design.md
       26-runtime-file-role-and-architecture-flow.md
       27-github-secrets-and-runtime-values.md
+      28-pre-apply-verification-checklist.md
     30-presentation/
       README.md
       10-expected-effects.md

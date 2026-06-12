@@ -137,5 +137,9 @@ LOCAL_RESULT_DIR="$TMP_DIR/lambda-results" python3 lambda/analysis-orchestrator/
 
 echo "[8/8] AWS terraform destroy script help"
 scripts/aws/destroy-terraform-stack.sh --help >/dev/null
+node --check dashboard/src/main.js >/dev/null
+node --check dashboard/src/data/loadDashboardData.js >/dev/null
+node --check dashboard/src/data/sample-dashboard.js >/dev/null
+python3 -m json.tool dashboard/data-contracts/dashboard-data.schema.json >/dev/null
 
 echo "Local test passed. Artifacts: $TMP_DIR"
