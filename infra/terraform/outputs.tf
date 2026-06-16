@@ -33,3 +33,11 @@ output "athena_workgroup_name" {
 output "slack_interactivity_url" {
   value = "${aws_apigatewayv2_api.slack_approval.api_endpoint}/slack/interactions"
 }
+
+output "dashboard_cloudfront_url" {
+  value = var.enable_dashboard ? "https://${aws_cloudfront_distribution.dashboard[0].domain_name}" : null
+}
+
+output "dashboard_api_url" {
+  value = var.enable_dashboard ? aws_apigatewayv2_api.dashboard[0].api_endpoint : null
+}

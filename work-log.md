@@ -2247,3 +2247,47 @@ dashboard /api/status 통과
 dashboard /api/actions increase_memory 기록 통과
 pytest는 현재 환경에 설치되어 있지 않아 실행하지 못함
 ```
+
+### 2026-06-16 15:29 - Dashboard AWS Terraform 준비
+
+작업:
+
+```text
+dashboard AWS 배포 리소스를 같은 infra/terraform root 안에 별도 dashboard.tf 파일로 추가했다.
+Terraform root를 별도로 나누지 않고 enable_dashboard=false 기본값으로 비활성화했다.
+dashboard-api Lambda를 추가해 DynamoDB action history 저장과 EventBridge DeploymentActionApproved 발행을 담당하게 했다.
+CloudFront 기본 origin은 S3 dashboard static frontend로 설정했다.
+CloudFront ordered behavior /api/* 는 API Gateway dashboard API로 라우팅하게 했다.
+S3 dashboard bucket은 public access block + CloudFront OAC 방식으로 구성했다.
+Terraform이 dashboard 정적 파일을 S3 object로 업로드하도록 구성했다.
+local-only server.mjs는 운영 S3 업로드 대상에서 제외했다.
+```
+
+추가 파일:
+
+```text
+lambda/dashboard-api/app.py
+infra/terraform/dashboard.tf
+```
+
+수정 파일:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh
+infra/terraform/variables.tf
+infra/terraform/outputs.tf
+docs/20-implementation/28-pre-apply-verification-checklist.md
+work-log.md
+```
+
+검증:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh 통과
+build/dashboard-api.zip 생성 확인
+terraform -chdir=infra/terraform fmt -check 통과
+terraform -chdir=infra/terraform validate 통과
+기본 plan: 28 to add, 0 to change, 0 to destroy
+dashboard 활성화 plan: 49 to add, 0 to change, 0 to destroy
+apply는 실행하지 않음
+```

@@ -102,3 +102,15 @@ variable "app_deploy_workflow_ref" {
   type    = string
   default = "main"
 }
+
+variable "enable_dashboard" {
+  type        = bool
+  default     = false
+  description = "Create the optional AWS-hosted dashboard stack. Keep false until Slack-only operations are validated."
+}
+
+variable "dashboard_bucket_name" {
+  type        = string
+  default     = null
+  description = "Optional S3 bucket name for the dashboard static frontend."
+}

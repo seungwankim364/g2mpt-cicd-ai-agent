@@ -20,6 +20,32 @@ terraform -chdir=infra/terraform plan -out=tfplan
 terraform -chdir=infra/terraform apply tfplan
 ```
 
+Dashboard AWS 리소스는 기본 비활성화 상태다.
+
+```bash
+terraform -chdir=infra/terraform plan -var enable_dashboard=true -out=tfplan-dashboard
+```
+
+Dashboard를 켜면 추가되는 리소스:
+
+```text
+S3 dashboard static bucket
+CloudFront dashboard distribution
+CloudFront /api/* -> API Gateway routing
+API Gateway dashboard API
+Lambda dashboard-api
+DynamoDB dashboard action table
+IAM role/policy
+S3 dashboard object uploads
+```
+
+기본 plan은 dashboard를 만들지 않는다.
+
+```text
+enable_dashboard=false -> dashboard resources disabled
+enable_dashboard=true  -> dashboard resources enabled
+```
+
 생성 후 확인할 output:
 
 ```text
@@ -29,6 +55,8 @@ result_bucket_name
 athena_database_name
 athena_workgroup_name
 slack_interactivity_url
+dashboard_cloudfront_url
+dashboard_api_url
 ```
 
 퇴근 전 비용 정리는 stop이 아니라 Terraform destroy 기준이다.
