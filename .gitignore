@@ -16,3 +16,4 @@ deployment-action-approved-event.json
 
 .aws-stop-state/
 build/
+dashboard/runtime/

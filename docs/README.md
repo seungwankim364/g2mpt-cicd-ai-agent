@@ -39,6 +39,7 @@
 | DOC-31 | [Runtime File Role and Architecture Flow](20-implementation/26-runtime-file-role-and-architecture-flow.md) | yml/sh/py 파일별 역할과 실제 아키텍처 실행 흐름 |
 | DOC-32 | [GitHub Secrets and Runtime Values](20-implementation/27-github-secrets-and-runtime-values.md) | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 정리 |
 | DOC-33 | [Pre-Apply Verification Checklist](20-implementation/28-pre-apply-verification-checklist.md) | apply 전 Terraform, dispatch workflow, Slack signing secret 점검 |
+| DOC-34 | [Dashboard Control Center Checklist](20-implementation/29-dashboard-control-center-checklist.md) | dashboard local backend, 버튼, live 연결 체크리스트 |
 
 ## 30. Presentation
 

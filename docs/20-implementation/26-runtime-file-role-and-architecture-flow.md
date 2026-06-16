@@ -38,6 +38,9 @@ Developer 또는 운영자
   -> fallback이면 ai-agent/app/analyzer.py
   -> ai-agent/app/slack_message_builder.py
   -> Slack #cd-deploy-alarm 2차 분석/승인 알림
+  -> dashboard/server.mjs
+  -> dashboard/src/main.js
+  -> 운영자가 timeline, health, AI 분석, 승인 action, infra 상태 확인
 ```
 
 ## 1.1 현재 확정된 runtime architecture tree
@@ -160,6 +163,27 @@ cd-quality-gate-runtime
     output:
       slack-channel: #cd-deploy-alarm
       message: rollback / DR / change approval recommendation
+
+  dashboard-control-center
+    owner: cd-quality-gate-architecture
+    backend: dashboard/server.mjs
+    frontend: dashboard/src/main.js
+    static-entry: dashboard/index.html
+    data-contract: dashboard/data-contracts/dashboard-data.schema.json
+    demo-data: dashboard/src/data/sample-dashboard.js
+    runtime-action-log: dashboard/runtime/actions.json
+    local-api:
+      - GET /api/dashboard
+      - GET /api/actions
+      - POST /api/actions
+      - POST /api/infra/apply-plan
+      - POST /api/infra/destroy-plan
+    purpose:
+      - Deployment Timeline 확인
+      - 5분 Quality Gate Health 확인
+      - AI Incident Analysis 확인
+      - rollback/DR/manual_fix/change 승인 기록
+      - Terraform apply/destroy plan 확인
 ```
 
 중요한 점은 이 저장소가 기존 배포 앞단을 다시 만들지 않는다는 것이다. build, ECR push, GitOps values update, Argo CD automated sync는 이미 `gympt-ops`에 있다. 이 저장소는 그 이후의 post-deploy Quality Gate와 AI Incident Analysis만 추가한다.
@@ -195,6 +219,10 @@ cd-quality-gate-runtime
 | Local AI fallback | `ai-agent/app/analyzer.py` | Bedrock 비활성/실패 시 alert와 Athena signal을 읽고 rule 기반 추천 조치 생성 |
 | AI Slack message | `ai-agent/app/slack_message_builder.py` | AI 분석 결과를 Slack 2차 알림 구조로 변환 |
 | Runbook | `scripts/runbooks/*.sh` | alert별 사람이 확인할 운영 명령과 절차 |
+| Dashboard backend | `dashboard/server.mjs` | 정적 대시보드와 local API를 제공하고 승인 action 기록, apply/destroy plan을 반환 |
+| Dashboard frontend | `dashboard/src/main.js` | timeline, health, AI 분석, approval, infra/cost 화면을 렌더링하고 backend API 버튼을 호출 |
+| Dashboard data contract | `dashboard/data-contracts/dashboard-data.schema.json` | live adapter가 받아야 하는 dashboard JSON 구조 정의 |
+| Dashboard runtime actions | `dashboard/runtime/actions.json` | local backend가 기록한 승인 action 이력. Git에는 올리지 않음 |
 | Local test | `scripts/test-local.sh` | 위 흐름을 fixture 기반으로 로컬에서 한 번에 검증 |
 
 ## 3. GitHub Actions yml 역할

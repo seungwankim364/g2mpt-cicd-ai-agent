@@ -104,6 +104,8 @@
       }
     },
     "approvals": { "type": "array", "items": { "type": "object" } },
+    "latestAction": { "type": ["object", "null"] },
+    "actionHistory": { "type": "array", "items": { "type": "object" } },
     "infra": {
       "type": "object",
       "required": ["terraformState", "resources", "checklist"],

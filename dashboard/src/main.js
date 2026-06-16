@@ -1,5 +1,7 @@
 import { loadDashboardData } from "./data/loadDashboardData.js";
 
+let currentSource = "initializing";
+
 const STATUS_LABELS = {
   complete: "Complete",
   failed: "Failed",
@@ -27,6 +29,60 @@ function renderStatus(status) {
   const span = createElement("span", statusClass(status), STATUS_LABELS[status] || status);
   span.setAttribute("aria-label", `Status ${STATUS_LABELS[status] || status}`);
   return span;
+}
+
+function actionButton(label, onClick, variant = "secondary") {
+  const button = createElement("button", `action-button ${variant}`, label);
+  button.type = "button";
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function notify(message, tone = "info") {
+  let node = document.querySelector(".toast");
+  if (!node) {
+    node = createElement("div", "toast");
+    document.body.append(node);
+  }
+  node.className = `toast ${tone}`;
+  node.textContent = message;
+  window.setTimeout(() => node.remove(), 5000);
+}
+
+async function postJson(path, body = {}) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+  return payload;
+}
+
+async function refreshDashboard() {
+  const { data, source } = await loadDashboardData();
+  render(data, source);
+}
+
+async function recordApproval(action) {
+  try {
+    const result = await postJson("/api/actions", { action, approvedBy: "dashboard-local" });
+    render(result.dashboard, "local backend");
+    notify(`${action} action recorded. Dispatch payload is stored in dashboard/runtime/actions.json.`, "success");
+  } catch (error) {
+    notify(`Unable to record ${action}: ${error.message}`, "error");
+  }
+}
+
+async function showPlan(kind) {
+  try {
+    const result = await postJson(`/api/infra/${kind}-plan`);
+    const message = result.commands.join("  ->  ");
+    notify(message, "info");
+  } catch (error) {
+    notify(`Unable to load ${kind} plan: ${error.message}`, "error");
+  }
 }
 
 function metricTile(label, value, tone = "neutral") {
@@ -61,6 +117,7 @@ function renderHeader(data, source) {
   actions.append(renderStatus(data.deployment.status));
   actions.append(createElement("span", "source-pill", source));
   actions.append(createElement("span", "source-pill", `Updated ${formatTime(data.deployment.lastUpdatedAt)}`));
+  actions.append(actionButton("Refresh", refreshDashboard, "secondary"));
 
   header.append(titleGroup, actions);
   return header;
@@ -192,7 +249,7 @@ function renderApprovals(data) {
   section.append(sectionHeader("Approval & Action", "Slack approval to GitHub workflow dispatch"));
   const table = createElement("div", "table");
   const header = createElement("div", "table-row table-head");
-  ["Action", "Status", "Target", "Workflow"].forEach((text) => header.append(createElement("span", "", text)));
+  ["Action", "Status", "Target", "Workflow", "Control"].forEach((text) => header.append(createElement("span", "", text)));
   table.append(header);
 
   data.approvals.forEach((item) => {
@@ -203,6 +260,7 @@ function renderApprovals(data) {
     row.append(statusCell);
     row.append(createElement("span", "", item.target));
     row.append(createElement("span", "", item.workflow));
+    row.append(actionButton(`Record ${item.action}`, () => recordApproval(item.action), item.action === "rollback" ? "danger" : "secondary"));
     table.append(row);
   });
   section.append(table);
@@ -236,6 +294,11 @@ function renderInfra(data) {
     checklist.append(row);
   });
   section.append(checklist);
+
+  const controls = createElement("div", "control-row");
+  controls.append(actionButton("Show apply plan", () => showPlan("apply"), "secondary"));
+  controls.append(actionButton("Show destroy plan", () => showPlan("destroy"), "danger"));
+  section.append(controls);
   return section;
 }
 
@@ -263,6 +326,7 @@ function renderLinks(data) {
 }
 
 function render(data, source) {
+  currentSource = source;
   const app = document.querySelector("#app");
   app.innerHTML = "";
   app.append(renderHeader(data, source));
@@ -278,6 +342,17 @@ function render(data, source) {
   layout.append(renderInfra(data));
   app.append(layout);
   app.append(renderLinks(data));
+  if (data.latestAction) {
+    app.append(renderActionDetail(data.latestAction));
+  }
+}
+
+function renderActionDetail(action) {
+  const section = createElement("section", "panel action-detail");
+  section.append(sectionHeader("Latest Backend Action", "Recorded by local dashboard backend"));
+  const pre = createElement("pre", "", JSON.stringify(action, null, 2));
+  section.append(pre);
+  return section;
 }
 
 loadDashboardData().then(({ data, source }) => render(data, source));

@@ -19,6 +19,69 @@ gympt-ops를 참고한 경우 반드시 "read-only"라고 명시한다.
 실패하거나 되돌린 작업도 기록한다.
 ```
 
+## 2026-06-16
+
+### 2026-06-16 10:17 - Dashboard local backend와 버튼 action 연결
+
+작업:
+
+```text
+아키텍처 흐름도 위치를 재확인했다.
+실제 draw.io 다이어그램은 cd-quality-gate-ai-incident-analysis.drawio이고, 파일 실행 기준 흐름은 docs/20-implementation/26-runtime-file-role-and-architecture-flow.md가 기준이다.
+dashboard/server.mjs local backend를 추가해 정적 dashboard와 API를 함께 제공하도록 구성했다.
+GET /api/dashboard, GET /api/actions, POST /api/actions, POST /api/infra/apply-plan, POST /api/infra/destroy-plan을 추가했다.
+대시보드 기본 data adapter를 /api/dashboard 우선으로 변경하고, backend가 없으면 demo fallback으로 동작하도록 유지했다.
+Approval & Action 영역에 rollback/dr/manual_fix/change 기록 버튼을 연결했다.
+Infra & Cost 영역에 apply plan, destroy plan 버튼을 연결했다.
+버튼은 실제 AWS/GitHub 작업을 직접 실행하지 않고 dashboard/runtime/actions.json에 action record와 dispatch payload를 남기는 안전한 local control-plane으로 구현했다.
+Runtime File Role and Architecture Flow에 dashboard-control-center tree와 draw.io 영역 매핑을 추가했다.
+Dashboard Control Center Checklist 문서를 추가했다.
+```
+
+추가 파일:
+
+```text
+dashboard/server.mjs
+docs/20-implementation/29-dashboard-control-center-checklist.md
+```
+
+수정 파일:
+
+```text
+.gitignore
+README.md
+dashboard/README.md
+dashboard/data-contracts/dashboard-data.schema.json
+dashboard/src/data/loadDashboardData.js
+dashboard/src/main.js
+dashboard/src/styles.css
+docs/README.md
+docs/20-implementation/README.md
+docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
+docs/90-reference/13-repository-architecture.md
+scripts/test-local.sh
+work-log.md
+```
+
+검증:
+
+```text
+node --check dashboard/server.mjs 통과
+node --check dashboard/src/main.js 통과
+node --check dashboard/src/data/loadDashboardData.js 통과
+python3 -m json.tool dashboard/data-contracts/dashboard-data.schema.json 통과
+scripts/test-local.sh 통과
+node dashboard/server.mjs 실행 중: http://localhost:5173
+```
+
+주의:
+
+```text
+현재 dashboard 버튼은 안전한 기록/plan 버튼이다.
+실제 rollback/DR/change 실행은 Slack 승인 -> API Gateway -> EventBridge -> deployment-action-executor -> GitHub workflow dispatch 경로로 검증한다.
+live 운영 데이터 연결은 서비스와 AWS stack이 올라온 뒤 dashboard-data.json 생성 또는 API adapter 연결 단계에서 진행한다.
+```
+
 ## 2026-06-09
 
 ### 2026-06-09 17:28 - 초기 문서 세트 정리

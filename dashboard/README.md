@@ -4,10 +4,10 @@ This dashboard is the operator view for the CD Quality Gate and AI incident anal
 
 It runs without AWS resources by using demo data. When the stack is live, place a generated `dashboard-data.json` next to `index.html` and open with `?mode=live`.
 
-## Open Locally
+## Open With Backend
 
 ```bash
-python3 -m http.server 5173 --directory dashboard
+node dashboard/server.mjs
 ```
 
 Then open:
@@ -16,10 +16,32 @@ Then open:
 http://localhost:5173
 ```
 
-Live adapter mode:
+The backend serves the static dashboard and local APIs:
 
 ```text
-http://localhost:5173?mode=live
+GET  /api/dashboard
+GET  /api/actions
+POST /api/actions
+POST /api/infra/apply-plan
+POST /api/infra/destroy-plan
+```
+
+Action records are written to:
+
+```text
+dashboard/runtime/actions.json
+```
+
+## Static Demo Mode
+
+```bash
+python3 -m http.server 5173 --directory dashboard
+```
+
+Then open:
+
+```text
+http://localhost:5173?mode=demo
 ```
 
 ## Data Contract
@@ -43,7 +65,7 @@ Demo data lives in:
 dashboard/src/data/sample-dashboard.js
 ```
 
-The live adapter currently reads:
+The file-based live adapter reads:
 
 ```text
 dashboard/dashboard-data.json

@@ -78,7 +78,7 @@ Existing gympt-ops CI/CD
 | Athena | [athena](athena) | query, query template, external table schema |
 | Infra | [infra](infra) | Terraform 기준 AWS 리소스 scaffold |
 | Schema | [schemas](schemas) | EventBridge, AI, Slack, rollback JSON schema |
-| Dashboard | [dashboard](dashboard) | CD Quality Gate 운영 콘솔, demo/live adapter, dashboard data contract |
+| Dashboard | [dashboard](dashboard) | CD Quality Gate 운영 콘솔, local backend API, demo/live adapter, dashboard data contract |
 | AWS 비용 절감 | [scripts/aws/destroy-terraform-stack.sh](scripts/aws/destroy-terraform-stack.sh) | 퇴근 전 Terraform stack destroy |
 | 로컬 통합 테스트 | [scripts/test-local.sh](scripts/test-local.sh) | fixture 기반 전체 흐름 검증 |
 
@@ -129,6 +129,18 @@ scripts/test-local.sh
 ```
 
 이 테스트는 backend alert뿐 아니라 SQS, Redis, GPU fixture alert도 Quality Gate에서 잡히는지 확인한다.
+
+대시보드 backend 포함 실행:
+
+```bash
+node dashboard/server.mjs
+```
+
+브라우저:
+
+```text
+http://localhost:5173
+```
 
 ## 퇴근 전 AWS 비용 절감
 
@@ -213,6 +225,7 @@ scripts/aws/destroy-terraform-stack.sh --execute
 | DOC-31 | [Runtime File Role and Architecture Flow](docs/20-implementation/26-runtime-file-role-and-architecture-flow.md) | yml/sh/py 파일별 역할과 실제 아키텍처 실행 흐름 |
 | DOC-32 | [GitHub Secrets and Runtime Values](docs/20-implementation/27-github-secrets-and-runtime-values.md) | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 정리 |
 | DOC-33 | [Pre-Apply Verification Checklist](docs/20-implementation/28-pre-apply-verification-checklist.md) | apply 전 Terraform, dispatch workflow, Slack signing secret 점검 |
+| DOC-34 | [Dashboard Control Center Checklist](docs/20-implementation/29-dashboard-control-center-checklist.md) | dashboard local backend, 버튼, live 연결 체크리스트 |
 
 ### 30. Presentation
 

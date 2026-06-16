@@ -57,6 +57,7 @@ cd-quality-gate-architecture/
       26-runtime-file-role-and-architecture-flow.md
       27-github-secrets-and-runtime-values.md
       28-pre-apply-verification-checklist.md
+      29-dashboard-control-center-checklist.md
     30-presentation/
       README.md
       10-expected-effects.md
@@ -114,6 +115,7 @@ cd-quality-gate-architecture/
 | `docs/20-implementation/26-runtime-file-role-and-architecture-flow.md` | DOC-31 | 실제 yml/sh/py/tf 파일이 아키텍처 흐름에서 수행하는 역할 |
 | `docs/20-implementation/27-github-secrets-and-runtime-values.md` | DOC-32 | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 |
 | `docs/20-implementation/28-pre-apply-verification-checklist.md` | DOC-33 | apply 전 Terraform, dispatch workflow, Slack signing secret 점검 |
+| `docs/20-implementation/29-dashboard-control-center-checklist.md` | DOC-34 | dashboard local backend, 버튼, live 연결 체크리스트 |
 | `docs/30-presentation/10-expected-effects.md` | DOC-10 | 기대 효과와 팀원 파트 연결 |
 | `docs/30-presentation/11-presentation-notes.md` | DOC-11 | 발표 스크립트와 설명 포인트 |
 | `docs/30-presentation/12-demo-scenario.md` | DOC-24 | 발표/시연 시나리오 |
