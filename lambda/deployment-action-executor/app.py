@@ -33,7 +33,20 @@ def _secret_value(secret_arn):
     if not secret_arn or boto3 is None:
         return os.environ.get("GITHUB_TOKEN", "")
     response = boto3.client("secretsmanager").get_secret_value(SecretId=secret_arn)
-    return response.get("SecretString", "")
+    secret = response.get("SecretString", "")
+    if not secret:
+        return ""
+    try:
+        parsed = json.loads(secret)
+    except json.JSONDecodeError:
+        return secret
+    if isinstance(parsed, dict):
+        for key in ("token", "github_token", "GITHUB_TOKEN", "dispatch_token", "GH_WORKFLOW_DISPATCH_TOKEN"):
+            if parsed.get(key):
+                return parsed[key]
+        if len(parsed) == 1:
+            return next(iter(parsed.values()))
+    return secret
 
 
 def _dispatch_workflow(repo, workflow_file, token, detail):

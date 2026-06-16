@@ -322,9 +322,10 @@ slack_interactivity_url
 현재 local workflow scaffold는 있다. 하지만 실제 dispatch 대상 repository에 workflow가 있어야 한다.
 
 ```text
-[x] gympt-gitops/.github/workflows/rollback.yml 추가
-[ ] cd-quality-gate dispatch token이 hj-3/gympt-gitops workflow_dispatch 권한을 갖는지 확인
-[ ] gympt-gitops의 기존 GITOPS_PAT가 contents write 권한을 갖는지 확인
+[x] cd-quality-gate rollback workflow가 GitOps values 직접 수정 방식으로 변경됨
+[x] cd-quality-gate AWS dispatch token이 cd-quality-gate rollback.yml workflow_dispatch 권한을 갖는지 확인
+[x] cd-quality-gate GitHub Secret GH_WORKFLOW_DISPATCH_TOKEN 존재 확인
+[x] 새 PAT가 hj-3/gympt-gitops push 권한을 갖는지 확인
 [ ] DR target repository에 dr-failover workflow 존재 확인
 [ ] gympt-app repository에 app deploy workflow 존재 확인
 [ ] dispatch token에 workflow dispatch 권한 확인
@@ -361,17 +362,64 @@ slack_interactivity_url
 ### 5.1 서비스가 내려가 있는 지금 할 수 있는 일
 
 ```text
-[ ] docs 최종 검토
-[ ] README 문구 검토
+[x] docs 최종 검토 기준 문서 추가
+[x] README 문구 업데이트
+[x] GitHub Secrets 이름 정리
+[x] AWS Secrets Manager secret ARN 입력
+[x] dispatch 대상 repository/workflow 이름 정리
+[x] dashboard 화면 구성 추가
+[x] rollback workflow를 cd-quality-gate 직접 GitOps push 방식으로 변경
+[x] Lambda zip 재생성
+[x] terraform fmt -check 통과
+[x] terraform validate 통과
+[x] AWS login 재인증
+[x] terraform plan -out=tfplan 실행
+[x] GitHub dispatch token 권한 교체
 [ ] Slack App Interactivity 메뉴 위치 확인
-[ ] GitHub Secrets 이름 오타 확인
-[ ] AWS Secrets Manager secret 값 최신 여부 확인
-[ ] dispatch 대상 repository/workflow 이름 확인
-[ ] dashboard 화면 구성 검토
-[ ] draw.io 아키텍처 박스와 DOC-31 흐름 일치 여부 검토
+[ ] draw.io 아키텍처 박스와 DOC-31 흐름 일치 여부 최종 검토
 ```
 
-### 5.2 AWS를 다시 올릴 때 해야 할 일
+### 5.2 서비스 테스트 전 사전 작업 체크리스트
+
+이 단계에서는 `terraform apply`를 실행하지 않는다.
+
+```text
+1. [x] Lambda zip 재생성
+   command: scripts/lambda/package-analysis-orchestrator.sh
+
+2. [x] Terraform fmt 확인
+   command: terraform -chdir=infra/terraform fmt -check
+
+3. [x] Terraform validate 확인
+   command: terraform -chdir=infra/terraform validate
+
+4. [x] cd-quality-gate rollback workflow YAML 확인
+   file: .github/workflows/rollback.yml
+
+5. [x] AWS login 재인증
+   command: aws login
+
+6. [x] Terraform plan 확인
+   command: AWS_PROFILE=ksw2 terraform -chdir=infra/terraform plan -out=tfplan
+   result: 28 to add, 0 to change, 0 to destroy
+
+7. [x] plan 결과에서 생성 대상 확인
+   check: Lambda, EventBridge, API Gateway, S3, Athena, IAM
+
+8. [x] GitHub token 권한 수정
+   AWS secret token: repo scope 확인, cd-quality-gate rollback.yml workflow_dispatch 권한 확인
+   GitHub secret GH_WORKFLOW_DISPATCH_TOKEN: secret name 존재 확인
+   PAT permission: hj-3/gympt-gitops push true 확인
+```
+
+중요:
+
+```text
+terraform apply는 서비스 테스트 전 사전 작업 범위에서 제외한다.
+현재 plan은 완료되었고 `tfplan` 파일이 생성되었다.
+```
+
+### 5.3 AWS를 다시 올릴 때 해야 할 일
 
 ```text
 [ ] scripts/lambda/package-analysis-orchestrator.sh 실행
@@ -385,7 +433,7 @@ slack_interactivity_url
 [ ] EventBridge rule target 확인
 ```
 
-### 5.3 서비스가 다시 올라온 뒤 해야 할 일
+### 5.4 서비스가 다시 올라온 뒤 해야 할 일
 
 ```text
 [ ] EKS node 확인
@@ -402,7 +450,7 @@ slack_interactivity_url
 [ ] 재배포 후 최종 완료 알림 확인
 ```
 
-### 5.4 퇴근 전 해야 할 일
+### 5.5 퇴근 전 해야 할 일
 
 ```text
 [ ] cd-quality-gate Terraform state에 생성된 리소스만 확인

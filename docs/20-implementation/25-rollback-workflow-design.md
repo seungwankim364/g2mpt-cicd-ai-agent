@@ -2,14 +2,14 @@
 
 ## 1. 목적
 
-Slack 승인 이후 rollback 요청을 기존 PAT가 있는 GitOps repository workflow로 전달하고, GitOps repository 안에서 Helm values image tag를 이전 tag로 되돌리는 workflow를 설계한다.
+Slack 승인 이후 rollback 요청을 받아 `cd-quality-gate` workflow가 GitOps repository의 Helm values image tag를 이전 tag로 되돌리는 workflow를 설계한다.
 
 ## 2. 원칙
 
 ```text
 AI Agent는 rollback을 직접 실행하지 않음
 운영자 승인 이후에만 rollback 실행
-rollback은 기존 PAT가 있는 gympt-gitops workflow에서 GitOps values image tag rollback commit으로 수행
+rollback은 cd-quality-gate workflow에서 GitOps values image tag rollback commit으로 수행
 rollback 후 Quality Gate 재검증은 Argo CD sync 이후 후속 workflow에서 수행
 모든 승인과 실행 결과를 audit trail로 저장
 ```
@@ -106,12 +106,11 @@ argocd app rollback backend-api-prod <history-id>
 ```text
 1. 승인 payload 검증
 2. rollback 대상 image tag 확인
-3. gympt-gitops rollback workflow dispatch
+3. GitOps values image tag rollback commit
 4. rollback request artifact 저장
-5. gympt-gitops workflow가 values-prod.yaml image.tag rollback commit 생성
-6. Argo CD가 GitOps 변경을 감지해 EKS에 sync
-7. rollout과 Quality Gate 재검증 수행
-8. 결과 Slack 알림과 S3 status 업데이트
+5. Argo CD가 GitOps 변경을 감지해 EKS에 sync
+6. rollout과 Quality Gate 재검증 수행
+7. 결과 Slack 알림과 S3 status 업데이트
 ```
 
 ## 8. GitHub Actions Job 구조
@@ -119,8 +118,7 @@ argocd app rollback backend-api-prod <history-id>
 ```text
 rollback.yml
   validate-approval
-  dispatch gympt-gitops rollback workflow
-  dispatch gympt-app deployment workflow from beginning
+  update gympt-gitops values image tag
   upload rollback request artifact
 ```
 
@@ -137,9 +135,9 @@ deployment-action-executor
   dispatch rollback/dr/manual_fix/change workflow by action type
 ```
 
-실제 rollback 실행은 기존 PAT가 있는 `hj-3/gympt-gitops` workflow가 수행한다. 이 repo의 `rollback.yml`은 대상 workflow를 dispatch하는 wrapper다. DR 실행은 아직 대상 repo에 DR workflow가 없다면 새 workflow를 만들거나 이 repo의 `dr-failover.yml`에 실제 DR 명령을 연결해야 한다. 대상 workflow repository는 Terraform 변수 `rollback_workflow_repo`, `dr_workflow_repo`, `manual_fix_workflow_repo`, `change_workflow_repo`로 지정한다.
+실제 rollback 실행은 이 repo의 `rollback.yml`이 `hj-3/gympt-gitops` values file을 직접 갱신하는 방식으로 수행한다. DR 실행은 아직 대상 repo에 DR workflow가 없다면 새 workflow를 만들거나 이 repo의 `dr-failover.yml`에 실제 DR 명령을 연결해야 한다. 대상 workflow repository는 Terraform 변수 `rollback_workflow_repo`, `dr_workflow_repo`, `manual_fix_workflow_repo`, `change_workflow_repo`로 지정한다.
 
-조치 workflow가 끝나면 `app_repo`, `app_workflow`, `app_ref` 입력값으로 기존 `gympt-app` 배포 workflow를 다시 dispatch한다. 이 app workflow가 build/test, ECR push, GitOps values update, Argo CD sync를 수행하고 마지막에 `quality-gate.yml`을 호출해야 Slack 배포 완료 알림까지 이어진다.
+rollback은 새 이미지를 빌드하는 작업이 아니므로 `gympt-app` 배포 workflow를 다시 dispatch하지 않는다. GitOps values tag가 이전 tag로 바뀌면 Argo CD가 변경을 감지해 `backend-api-prod`를 이전 이미지로 동기화한다.
 
 현재 이 repo에 생성된 실행 workflow:
 
@@ -150,7 +148,7 @@ deployment-action-executor
 .github/workflows/change-apply.yml
 ```
 
-`gympt-gitops/.github/workflows/rollback.yml`을 추가했다. 이 workflow는 `workflow_dispatch` 전용이며, `gympt-gitops` repo 안의 기존 `GITOPS_PAT`를 사용해 `charts/backend-api/values-prod.yaml`의 `image.tag`를 이전 tag로 갱신한다.
+`rollback.yml`은 `charts/backend-api/values-prod.yaml`의 `image.tag`를 이전 tag로 직접 갱신한다. 이때 `GH_WORKFLOW_DISPATCH_TOKEN`은 `hj-3/gympt-gitops`에 contents write 권한이 있어야 한다.
 `dr-failover.yml`은 아직 Route53, CloudFront, ALB, EKS 같은 운영 리소스를 직접 변경하지 않는다. 기존 AWS/GitOps 권한이 있는 대상 workflow를 새로 만들거나, 이 repo workflow에 실제 DR 명령을 연결해야 한다.
 
 ## 9. 실패 처리
@@ -219,7 +217,6 @@ Slack approval log
 ```text
 승인 없이 rollback workflow 실행 불가
 rollback 대상 image tag가 명확히 기록됨
-gympt-gitops rollback workflow가 dispatch됨
 GitOps repository rollback commit이 생성됨
 Argo CD가 rollback tag를 기준으로 sync함
 rollback 후 Quality Gate 재검증 흐름이 추적됨

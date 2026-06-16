@@ -21,6 +21,222 @@ gympt-ops를 참고한 경우 반드시 "read-only"라고 명시한다.
 
 ## 2026-06-16
 
+### 2026-06-16 12:35 - 새 GitHub PAT 권한 확인
+
+작업:
+
+```text
+사용자가 classic PAT를 repo scope로 재발급하고 AWS Secrets Manager와 GitHub Secret에 반영했다.
+AWS Secrets Manager cd-quality-gate/github/dispatch-token 값을 직접 출력하지 않고 GitHub API 권한만 확인했다.
+실제 rollback workflow는 실행하지 않고, 존재하지 않는 ref로 workflow_dispatch API를 호출해 권한을 비파괴 검증했다.
+```
+
+확인 결과:
+
+```text
+AWS Secrets Manager token prefix: ghp_
+GitHub token scope: repo
+GitHub user: seungwankim364
+seungwankim364/g2mpt-cicd-ai-agent permissions: admin true, push true
+hj-3/gympt-gitops permissions: push true
+cd-quality-gate rollback workflow: active
+cd-quality-gate GH_WORKFLOW_DISPATCH_TOKEN secret name: exists
+workflow_dispatch invalid ref check: HTTP 422 No ref found
+```
+
+판단:
+
+```text
+HTTP 422는 workflow_dispatch 권한은 통과했고 ref만 없다는 뜻이므로 dispatch 권한 확인으로 본다.
+GitHub Secret 값은 API로 읽을 수 없지만, secret 이름은 존재한다.
+사용자가 같은 PAT를 GH_WORKFLOW_DISPATCH_TOKEN에 넣었다면 rollback.yml이 gympt-gitops에 직접 push할 권한 조건은 충족된다.
+```
+
+### 2026-06-16 12:05 - rollback을 cd-quality-gate 직접 GitOps push 방식으로 변경
+
+작업:
+
+```text
+사용자가 hj-3/gympt-gitops collaborator 권한을 갖고 직접 push/pull 가능하다는 전제로 rollback 구조를 다시 정리했다.
+gympt-gitops에 별도 rollback workflow를 두지 않고, cd-quality-gate의 rollback.yml이 gympt-gitops values-prod.yaml image.tag를 직접 이전 tag로 갱신하도록 변경했다.
+rollback은 새 이미지를 빌드하는 작업이 아니므로 gympt-app 배포 workflow 재실행 step을 제거했다.
+gympt-gitops에 추가했던 rollback workflow 파일은 삭제했다.
+integration-templates/gympt-gitops rollback workflow 템플릿도 삭제했다.
+```
+
+수정 파일:
+
+```text
+.github/workflows/rollback.yml
+infra/terraform/variables.tf
+README.md
+docs/20-implementation/25-rollback-workflow-design.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+docs/20-implementation/28-pre-apply-verification-checklist.md
+docs/20-implementation/30-final-status-and-user-checklist.md
+dashboard/src/data/sample-dashboard.js
+work-log.md
+```
+
+삭제 파일:
+
+```text
+../gympt-ops/gympt-gitops/.github/workflows/rollback.yml
+integration-templates/gympt-gitops/.github/workflows/rollback.yml
+```
+
+권한 기준:
+
+```text
+AWS Secrets Manager cd-quality-gate/github/dispatch-token:
+  - seungwankim364/g2mpt-cicd-ai-agent Actions read/write 필요
+  - deployment-action-executor가 cd-quality-gate rollback.yml을 dispatch하기 위해 사용
+
+cd-quality-gate GitHub Secret GH_WORKFLOW_DISPATCH_TOKEN:
+  - hj-3/gympt-gitops Contents read/write 필요
+  - rollback.yml이 values-prod.yaml image.tag를 직접 commit/push하기 위해 사용
+```
+
+주의:
+
+```text
+팀원 repo인 gympt-gitops에는 rollback workflow를 유지하지 않는다.
+대신 사용자 PAT/collaborator 권한으로 cd-quality-gate workflow가 GitOps values를 직접 수정한다.
+```
+
+### 2026-06-16 11:50 - GitHub dispatch token 권한과 Secret 형식 확인
+
+작업:
+
+```text
+AWS Secrets Manager의 cd-quality-gate/github/dispatch-token 값을 직접 출력하지 않고 형식만 확인했다.
+SecretString은 순수 PAT 문자열이 아니라 JSON 형태이며 key는 cd-quality-gate/github/dispatch-token이다.
+기존 deployment-action-executor는 SecretString 전체를 token으로 사용하므로 GitHub API 호출 시 401이 날 수 있음을 확인했다.
+deployment-action-executor가 JSON secret을 파싱하고 단일 key secret 값도 token으로 사용할 수 있게 수정했다.
+GitHub API로 hj-3/gympt-gitops repo와 rollback workflow 조회를 확인했다.
+실제 workflow를 실행하지 않기 위해 존재하지 않는 ref로 workflow_dispatch 권한을 확인했다.
+```
+
+확인 결과:
+
+```text
+GitHub token user: seungwankim364
+hj-3/gympt-gitops repo 조회: 성공
+hj-3/gympt-gitops rollback workflow 조회: 성공, state active
+hj-3/gympt-gitops permissions: push true, pull true
+workflow_dispatch permission check: 실패, HTTP 403 Resource not accessible by personal access token
+gympt-gitops actions secrets list: 실패, HTTP 403
+cd-quality-gate actions secrets list: 실패, HTTP 403
+```
+
+수정 파일:
+
+```text
+lambda/deployment-action-executor/app.py
+work-log.md
+```
+
+남은 일:
+
+```text
+AWS Secrets Manager cd-quality-gate/github/dispatch-token 값을 workflow_dispatch 가능한 token으로 교체해야 한다.
+토큰에는 hj-3/gympt-gitops Actions workflow dispatch 권한이 필요하다.
+gympt-gitops 안의 GITOPS_PAT 존재 여부는 현재 token으로 API 조회가 불가능하므로 GitHub UI에서 확인해야 한다.
+```
+
+### 2026-06-16 11:20 - 서비스 테스트 전 사전 체크리스트를 plan 기준으로 정리
+
+작업:
+
+```text
+서비스를 다시 띄우기 전 할 수 있는 작업을 Terraform plan까지만으로 제한했다.
+terraform apply는 사전 작업 범위에서 제외했다.
+Lambda zip 3개를 최신 코드 기준으로 다시 생성했다.
+terraform fmt -check와 terraform validate를 확인했다.
+terraform plan -out=tfplan은 AWS profile ksw2 session expired 때문에 완료하지 못했다.
+```
+
+실행 결과:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh 성공
+terraform -chdir=infra/terraform fmt -check 최초 실패: terraform.tfvars formatting
+terraform -chdir=infra/terraform fmt 실행: 값 변경 없이 formatting 반영
+terraform -chdir=infra/terraform fmt -check 통과
+terraform -chdir=infra/terraform validate 통과
+terraform -chdir=infra/terraform plan -out=tfplan 실패: No valid credential sources found
+aws sts get-caller-identity --profile ksw2 실패: session expired, aws login 필요
+terraform -chdir=infra/terraform plan -refresh=false -out=tfplan 실패: provider credential 필요
+```
+
+수정 파일:
+
+```text
+build/analysis-orchestrator.zip
+build/slack-approval-handler.zip
+build/deployment-action-executor.zip
+infra/terraform/terraform.tfvars
+docs/20-implementation/30-final-status-and-user-checklist.md
+work-log.md
+```
+
+남은 일:
+
+```text
+aws login으로 ksw2 profile 재인증
+AWS_PROFILE=ksw2 terraform -chdir=infra/terraform plan -out=tfplan 재실행
+apply는 아직 실행하지 않음
+```
+
+### 2026-06-16 11:35 - Terraform plan 완료
+
+작업:
+
+```text
+사용자가 aws login을 완료한 뒤 Terraform plan을 다시 실행했다.
+AWS_PROFILE=ksw2만으로는 Terraform provider가 credential을 읽지 못해 AWS CLI export-credentials를 같은 쉘에 주입해 plan을 실행했다.
+terraform apply는 실행하지 않았다.
+```
+
+실행 결과:
+
+```text
+terraform -chdir=infra/terraform plan -out=tfplan 성공
+Plan: 28 to add, 0 to change, 0 to destroy
+Saved the plan to: tfplan
+```
+
+생성 예정 범위:
+
+```text
+API Gateway Slack interactivity endpoint
+Athena database/workgroup
+EventBridge bus/rules/targets
+IAM roles/policies
+Lambda 3개
+Lambda permissions
+S3 result bucket and bucket controls
+Secrets Manager slack webhook secret resource
+```
+
+확인된 주요 output:
+
+```text
+event_bus_name: cd-quality-gate-prod-bus
+lambda_function_name: cd-quality-gate-prod-analysis-orchestrator
+result_bucket_name: cd-quality-gate-prod-results
+athena_database_name: cd_quality_gate_prod_logs
+athena_workgroup_name: cd-quality-gate-prod-workgroup
+slack_interactivity_url: known after apply
+```
+
+주의:
+
+```text
+tfplan 파일은 생성됐지만 apply는 아직 하지 않는다.
+실제 AWS 리소스는 아직 생성되지 않았다.
+```
+
 ### 2026-06-16 11:05 - gympt-gitops rollback workflow 실제 추가
 
 작업:

@@ -70,7 +70,7 @@ variable "bedrock_max_tokens" {
 
 variable "rollback_workflow_repo" {
   type    = string
-  default = "hj-3/gympt-gitops"
+  default = "seungwankim364/g2mpt-cicd-ai-agent"
 }
 
 variable "dr_workflow_repo" {

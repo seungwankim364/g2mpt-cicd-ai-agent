@@ -26,7 +26,7 @@ AWS Lambda는 가능하면 AWS Secrets Manager에서 secret을 읽는다.
 
 `GITOPS_PAT`는 기존 `gympt-ops` app CI/CD가 GitOps values update를 수행할 때 사용하는 secret이다. 이 저장소는 기존 배포 앞단을 다시 수행하지 않으므로 `GITOPS_PAT`를 필수 secret으로 받지 않는다.
 
-Slack 승인 후 자동 rollback도 이 저장소가 GitOps를 직접 수정하지 않는다. 기존 `GITOPS_PAT`가 있는 GitOps/gympt-ops 쪽 rollback workflow를 호출한다.
+Slack 승인 후 자동 rollback은 이 저장소의 rollback workflow가 `gympt-gitops` values tag를 직접 수정한다.
 
 대체 방식:
 
@@ -84,12 +84,12 @@ Repository
 | `ARGOCD_URL` | `https://argocd.g2mpt.com` | `.github/workflows/quality-gate.yml` | 1차 Slack 알림 Argo CD Application 링크 |
 | `ARGOCD_APP` | `backend-api-prod` | `.github/workflows/quality-gate.yml` | 1차 Slack 알림 대상 Application |
 | `GITOPS_REPO` | `hj-3/gympt-gitops` | 기존 gympt-ops app CI/CD | 이 저장소의 필수 runtime 값이 아님 |
-| `GITHUB_TOKEN_SECRET_ARN` | unset | Terraform variable `github_token_secret_arn` | 승인 후 대상 GitHub workflow dispatch용 token secret |
+| `GITHUB_TOKEN_SECRET_ARN` | unset | Terraform variable `github_token_secret_arn` | 승인 후 cd-quality-gate workflow dispatch용 token secret |
 | `SLACK_WEBHOOK_SECRET_ARN` | Terraform resource `aws_secretsmanager_secret.slack_webhook_url.arn` | `lambda/analysis-orchestrator/app.py` | Lambda가 Slack 2차 알림 webhook을 Secrets Manager에서 조회 |
 | `SLACK_SIGNING_SECRET_ARN` | unset | Terraform variable `slack_signing_secret_arn` | Slack 승인 버튼 요청 signature 검증용 signing secret |
 | `BEDROCK_ENABLED` | `true` | Terraform variable `bedrock_enabled` | Lambda Orchestrator가 Bedrock 분석을 사용할지 결정 |
 | `BEDROCK_MODEL_ID` | `anthropic.claude-3-haiku-20240307-v1:0` | Terraform variable `bedrock_model_id` | Bedrock Runtime 호출 모델 |
-| `ROLLBACK_WORKFLOW_REPO` | `hj-3/gympt-gitops` | Terraform variable `rollback_workflow_repo` | rollback 승인 시 dispatch할 GitOps repository |
+| `ROLLBACK_WORKFLOW_REPO` | `seungwankim364/g2mpt-cicd-ai-agent` | Terraform variable `rollback_workflow_repo` | rollback 승인 시 dispatch할 cd-quality-gate repository |
 | `DR_WORKFLOW_REPO` | unset | Terraform variable `dr_workflow_repo` | DR 승인 시 dispatch할 repository |
 | `APP_DEPLOY_WORKFLOW_REPO` | `hj-3/gympt-app` | Terraform variable `app_deploy_workflow_repo` | 조치 후 처음부터 다시 실행할 app 배포 workflow repository |
 | `APP_DEPLOY_WORKFLOW_FILE` | `backend-api-ci.yml` | Terraform variable `app_deploy_workflow_file` | 조치 후 다시 실행할 app 배포 workflow |
@@ -119,13 +119,13 @@ MVP에서는 코드에 고정된 값을 유지해도 된다. 여러 환경으로
 기존 gympt-ops app CI/CD가 GitOps values update를 수행할 때 사용한다.
 ```
 
-승인 기반 rollback은 기존 PAT가 있는 GitOps repo에 맞춘다.
+승인 기반 rollback은 cd-quality-gate workflow가 직접 GitOps values를 수정하는 방식으로 맞춘다.
 
 ```text
-../gympt-ops/gympt-gitops/.github/workflows/rollback.yml을 추가했다.
-이 workflow는 workflow_dispatch 전용이다.
-이 workflow는 gympt-gitops 안에 이미 있는 GITOPS_PAT를 사용해 values-prod.yaml image.tag를 직접 이전 tag로 갱신한다.
-이 repo의 GH_WORKFLOW_DISPATCH_TOKEN 또는 AWS Secrets Manager cd-quality-gate/github/dispatch-token은 gympt-gitops workflow_dispatch 호출 권한만 있으면 된다.
+팀원이 사용자를 hj-3/gympt-gitops collaborator로 추가한다.
+사용자 PAT는 hj-3/gympt-gitops contents write 권한을 갖는다.
+cd-quality-gate의 GH_WORKFLOW_DISPATCH_TOKEN은 rollback.yml 안에서 GITOPS_PAT로 사용되어 values-prod.yaml image.tag를 이전 tag로 갱신한다.
+AWS Secrets Manager cd-quality-gate/github/dispatch-token은 cd-quality-gate rollback.yml workflow_dispatch 호출 권한이 필요하다.
 ```
 
 기존 gympt-ops 책임:

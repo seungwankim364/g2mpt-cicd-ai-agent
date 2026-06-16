@@ -28,20 +28,11 @@ on:
       target_repo:
         required: false
         default: hj-3/gympt-gitops
-        description: Repository that owns the GitOps rollback workflow and GITOPS_PAT
-      target_workflow:
+        description: GitOps repository to update directly
+      values_file:
         required: false
-        default: rollback.yml
-        description: Workflow file in target_repo that updates GitOps values
-      app_repo:
-        required: false
-        default: hj-3/gympt-app
-      app_workflow:
-        required: false
-        default: backend-api-ci.yml
-      app_ref:
-        required: false
-        default: main
+        default: charts/backend-api/values-prod.yaml
+        description: Helm values file to update
 
 jobs:
   request-rollback:
@@ -51,11 +42,8 @@ jobs:
 
     env:
       TARGET_REPO: ${{ inputs.target_repo }}
-      TARGET_WORKFLOW: ${{ inputs.target_workflow }}
-      DISPATCH_TOKEN: ${{ secrets.GH_WORKFLOW_DISPATCH_TOKEN }}
-      APP_REPO: ${{ inputs.app_repo }}
-      APP_WORKFLOW: ${{ inputs.app_workflow }}
-      APP_REF: ${{ inputs.app_ref }}
+      VALUES_FILE: ${{ inputs.values_file }}
+      GITOPS_PAT: ${{ secrets.GH_WORKFLOW_DISPATCH_TOKEN }}
 
     steps:
       - name: Checkout
@@ -65,8 +53,8 @@ jobs:
         run: |
           test "${{ inputs.action_type }}" = "rollback"
           test -n "${{ inputs.target_image_tag }}"
-          if [ -z "$DISPATCH_TOKEN" ]; then
-            echo "GH_WORKFLOW_DISPATCH_TOKEN is required to call the GitOps rollback workflow." >&2
+          if [ -z "$GITOPS_PAT" ]; then
+            echo "GH_WORKFLOW_DISPATCH_TOKEN is required to push rollback tag to GitOps repository." >&2
             exit 2
           fi
 
@@ -85,40 +73,22 @@ jobs:
               "currentImageTag": "${{ inputs.current_image_tag }}",
               "targetImageTag": "${{ inputs.target_image_tag }}",
               "targetRepo": "${{ inputs.target_repo }}",
-              "targetWorkflow": "${{ inputs.target_workflow }}",
+              "valuesFile": "${{ inputs.values_file }}",
               "startedAt": datetime.now(timezone.utc).isoformat(),
-              "status": "dispatching_gitops_rollback_workflow"
+              "status": "updating_gitops_values_tag"
           }
           open("rollback-request.json", "w", encoding="utf-8").write(json.dumps(record, indent=2) + "\n")
           PY
 
-      - name: Dispatch GitOps rollback workflow
+      - name: Update GitOps values image tag
         run: |
-          scripts/github/dispatch-workflow.py \
-            --repo "$TARGET_REPO" \
-            --workflow "$TARGET_WORKFLOW" \
-            --ref main \
-            --token "$DISPATCH_TOKEN" \
-            --input "deployment_id=${{ inputs.deployment_id }}" \
-            --input "service=${{ inputs.service }}" \
-            --input "environment=${{ inputs.environment }}" \
-            --input "current_image_tag=${{ inputs.current_image_tag }}" \
-            --input "target_image_tag=${{ inputs.target_image_tag }}" \
-            --input "approved_by=${{ inputs.approved_by }}" \
-            --input "reason=${{ inputs.reason }}"
-
-      - name: Dispatch gympt-app deployment workflow
-        run: |
-          scripts/github/dispatch-workflow.py \
-            --repo "$APP_REPO" \
-            --workflow "$APP_WORKFLOW" \
-            --ref "$APP_REF" \
-            --token "$DISPATCH_TOKEN" \
-            --input "service=${{ inputs.service }}" \
-            --input "environment=${{ inputs.environment }}" \
-            --input "image_tag=${{ inputs.target_image_tag }}" \
-            --input "source_action=rollback" \
-            --input "deployment_id=${{ inputs.deployment_id }}"
+          SERVICE_NAME="${{ inputs.service }}" \
+          ENVIRONMENT="${{ inputs.environment }}" \
+          IMAGE_TAG="${{ inputs.target_image_tag }}" \
+          GITOPS_REPO="$TARGET_REPO" \
+          GITOPS_PAT="$GITOPS_PAT" \
+          VALUES_FILE="$VALUES_FILE" \
+          scripts/cd/update-gitops-image-tag.sh
 
       - name: Upload rollback request record
         if: always()
