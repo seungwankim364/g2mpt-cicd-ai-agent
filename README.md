@@ -79,6 +79,7 @@ Existing gympt-ops CI/CD
 | Schema | [schemas](schemas) | EventBridge, AI, Slack, rollback JSON schema |
 | Dashboard | [dashboard](dashboard) | CD Quality Gate 운영 콘솔, local backend API, demo/live adapter, dashboard data contract |
 | AWS 비용 절감 | [scripts/aws/destroy-terraform-stack.sh](scripts/aws/destroy-terraform-stack.sh) | 퇴근 전 Terraform stack destroy |
+| Dashboard AWS 삭제 | [scripts/aws/destroy-dashboard-stack.sh](scripts/aws/destroy-dashboard-stack.sh) | dashboard S3/CloudFront/API Gateway/Lambda/DynamoDB만 Terraform target destroy |
 | 로컬 통합 테스트 | [scripts/test-local.sh](scripts/test-local.sh) | fixture 기반 전체 흐름 검증 |
 
 파일별 역할과 실제 실행 흐름은 [Runtime File Role and Architecture Flow](docs/20-implementation/26-runtime-file-role-and-architecture-flow.md)를 기준으로 본다. 이 문서는 `cd-quality-gate-ai-incident-analysis.drawio`의 각 박스가 어떤 `yml`, `sh`, `py`, Terraform 파일로 실행되는지 연결한다.

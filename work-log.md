@@ -2400,3 +2400,101 @@ terraform -chdir=infra/terraform plan -out=tfplan 통과
 plan 결과: 27 to add, 0 to change, 0 to destroy
 apply는 실행하지 않음
 ```
+
+### 2026-06-16 16:04 - Dashboard AWS 전용 삭제 스크립트 추가
+
+작업:
+
+```text
+dashboard AWS 리소스만 한 번에 삭제하는 Terraform target destroy 스크립트를 추가했다.
+기본은 dry-run이며, 실제 삭제는 --execute와 ALLOW_PROD=true가 필요하게 했다.
+dashboard S3 bucket은 destroy 전에 비우도록 처리했다.
+기존 전체 stack destroy 스크립트도 dashboard bucket을 비우도록 보강했다.
+README와 pre-apply checklist에 dashboard 전용 삭제 절차를 추가했다.
+```
+
+추가 파일:
+
+```text
+scripts/aws/destroy-dashboard-stack.sh
+```
+
+수정 파일:
+
+```text
+scripts/aws/destroy-terraform-stack.sh
+README.md
+docs/20-implementation/28-pre-apply-verification-checklist.md
+work-log.md
+```
+
+검증:
+
+```text
+bash -n scripts/aws/destroy-dashboard-stack.sh scripts/aws/destroy-terraform-stack.sh 통과
+scripts/aws/destroy-dashboard-stack.sh --help 통과
+scripts/aws/destroy-dashboard-stack.sh dry-run 통과
+현재 dashboard resources는 Terraform state에 없어 No changes로 확인됨
+terraform -chdir=infra/terraform validate 통과
+실제 삭제는 실행하지 않음
+```
+
+### 2026-06-16 16:12 - 서비스 기동 전 최종 사전 점검
+
+작업:
+
+```text
+cd-quality-gate-architecture 실행 경로, GitHub workflow/action contract, Terraform 값, AWS/GitHub secret 존재 여부를 점검했다.
+gympt-ops/gympt-gitops의 backend-api-prod Argo CD Application, values-prod.yaml, namespace, image repository와 우리 설정을 비교했다.
+quality-gate.yml reusable workflow에 PROMETHEUS_URL, SLACK_WEBHOOK_URL, AWS_ROLE_ARN secrets 계약을 추가했다.
+cd-quality-gate-sample.yml의 Slack 채널과 alert list를 현재 운영 기준으로 수정했다.
+docs/27에 남아 있던 DR_WORKFLOW_REPO 설명을 제거했다.
+config/services/backend-api.yaml의 qualityGate alert list와 Grafana dashboard list를 실제 workflow 기준으로 확장했다.
+```
+
+확인 결과:
+
+```text
+AWS account: 337112169365
+AWS Secrets Manager cd-quality-gate/github/dispatch-token 존재 확인
+AWS Secrets Manager cd-quality-gate/slack/signing-secret 존재 확인
+AWS Secrets Manager cd-quality-gate-prod/slack/webhook-url 존재 확인
+GitHub repo seungwankim364/g2mpt-cicd-ai-agent 접근 가능
+GitHub Secrets AWS_ROLE_ARN, GH_WORKFLOW_DISPATCH_TOKEN, PROMETHEUS_URL, SLACK_WEBHOOK_URL 존재 확인
+GitHub dispatch token workflow_dispatch 권한 확인: rollback.yml invalid ref 테스트 HTTP 422
+GitHub dispatch token hj-3/gympt-gitops push 권한 확인
+GitHub dispatch token hj-3/gympt-app push 권한 확인
+remote dr-failover.yml 없음 확인
+gympt-gitops backend-api-prod Application namespace: gympt-prod
+gympt-gitops backend-api-prod chart path: charts/backend-api
+gympt-gitops backend-api-prod values file: values-prod.yaml
+gympt-gitops backend-api-prod image repository 일치
+Terraform-managed EventBridge/Lambda/S3/Athena resources는 아직 apply 전이라 미생성 상태
+```
+
+검증:
+
+```text
+Python compile 통과
+GitHub Actions YAML parse 통과
+script shell syntax 통과
+action contract 통과
+DR action schema 제거 확인
+scripts/test-local.sh 통과
+scripts/lambda/package-analysis-orchestrator.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+terraform -chdir=infra/terraform validate 통과
+terraform -chdir=infra/terraform plan -out=tfplan 통과
+plan 결과: 27 to add, 0 to change, 0 to destroy
+apply는 실행하지 않음
+```
+
+남은 서비스 기동 전 작업:
+
+```text
+현재 변경사항 commit/push 필요
+Terraform apply 필요
+apply 후 slack_interactivity_url을 Slack App Interactivity Request URL에 등록 필요
+gympt-app backend-api-ci.yml 마지막에 cd-quality-gate reusable workflow 호출 추가 필요
+EKS/self-hosted runner/Prometheus/backend-api-prod deployment 복구 후 실제 end-to-end 테스트 필요
+```

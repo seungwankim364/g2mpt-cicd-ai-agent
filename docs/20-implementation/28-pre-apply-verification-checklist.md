@@ -46,6 +46,41 @@ enable_dashboard=false -> dashboard resources disabled
 enable_dashboard=true  -> dashboard resources enabled
 ```
 
+Dashboard AWS 리소스만 따로 삭제할 때:
+
+```bash
+scripts/aws/destroy-dashboard-stack.sh
+```
+
+실제 삭제:
+
+```bash
+ALLOW_PROD=true scripts/aws/destroy-dashboard-stack.sh --execute
+```
+
+이 스크립트는 dashboard 관련 Terraform target만 삭제한다.
+
+```text
+S3 dashboard static bucket/object/policy
+CloudFront dashboard distribution/OAC
+API Gateway dashboard API
+Lambda dashboard-api
+DynamoDB dashboard action table
+IAM role/policy
+```
+
+Quality Gate core 리소스는 삭제 대상이 아니다.
+
+```text
+EventBridge bus
+Slack approval API
+analysis-orchestrator Lambda
+deployment-action-executor Lambda
+Athena
+result bucket
+Slack/GitHub Secrets Manager secret
+```
+
 Slack webhook secret은 이미 수동 생성된 값을 재사용한다.
 
 ```text

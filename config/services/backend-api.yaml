@@ -18,13 +18,27 @@ qualityGate:
     - BackendPodRestarting
     - BackendDBPoolExhaustion
     - BackendHighMemoryUsage
+    - SQSQueueBacklog
+    - SQSMessageAge
+    - SQSDLQMessages
+    - NodeHighCPUUsage
+    - PodRestartFrequent
+    - GPUHighUtilization
+    - GPUMemoryHigh
+    - RedisConnectionError
+    - RedisHighMemory
+    - RedisHighEvictionRate
+    - BedrockHighErrorRate
+    - BedrockThrottling
 
 grafana:
   dashboardKey: api-latency
   additionalDashboardKeys:
     - jvm-metrics
     - eks-overview
-    - athena-security-logs
+    - gpu-metrics
+    - redis-metrics
+    - sqs-metrics
 
 runbooks:
   default: backend-high-error-rate.sh

@@ -30,8 +30,8 @@ Safety:
   - ENVIRONMENT=prod execute is blocked unless ALLOW_PROD=true is set.
   - Existing external secrets listed in PROTECTED_STATE_ADDRESSES are removed
     from Terraform state before destroy, so destroy cannot delete them.
-  - If result_bucket_name exists in Terraform output, only that bucket is
-    emptied before destroy to avoid BucketNotEmpty failures.
+  - If result_bucket_name or dashboard bucket exists, only those project
+    buckets are emptied before destroy to avoid BucketNotEmpty failures.
 USAGE
 }
 
@@ -110,6 +110,15 @@ result_bucket_name="$(terraform -chdir="$TF_DIR" output -raw result_bucket_name 
 if [[ -n "$result_bucket_name" ]]; then
   log "Emptying Terraform result bucket before destroy: $result_bucket_name"
   aws s3 rm "s3://$result_bucket_name" --recursive --region "$AWS_REGION" || true
+fi
+
+dashboard_bucket_name="$(
+  terraform -chdir="$TF_DIR" state show 'aws_s3_bucket.dashboard[0]' 2>/dev/null |
+    awk -F'=' '/^[[:space:]]*bucket[[:space:]]*=/{gsub(/[ "]/, "", $2); print $2; exit}'
+)"
+if [[ -n "$dashboard_bucket_name" ]]; then
+  log "Emptying Terraform dashboard bucket before destroy: $dashboard_bucket_name"
+  aws s3 rm "s3://$dashboard_bucket_name" --recursive --region "$AWS_REGION" || true
 fi
 
 log "Destroying Terraform-managed resources"

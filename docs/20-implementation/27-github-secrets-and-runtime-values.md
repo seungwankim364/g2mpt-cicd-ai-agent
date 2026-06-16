@@ -90,7 +90,6 @@ Repository
 | `BEDROCK_ENABLED` | `true` | Terraform variable `bedrock_enabled` | Lambda Orchestrator가 Bedrock 분석을 사용할지 결정 |
 | `BEDROCK_MODEL_ID` | `anthropic.claude-3-haiku-20240307-v1:0` | Terraform variable `bedrock_model_id` | Bedrock Runtime 호출 모델 |
 | `ROLLBACK_WORKFLOW_REPO` | `seungwankim364/g2mpt-cicd-ai-agent` | Terraform variable `rollback_workflow_repo` | rollback 승인 시 dispatch할 cd-quality-gate repository |
-| `DR_WORKFLOW_REPO` | unset | Terraform variable `dr_workflow_repo` | DR 승인 시 dispatch할 repository |
 | `APP_DEPLOY_WORKFLOW_REPO` | `hj-3/gympt-app` | Terraform variable `app_deploy_workflow_repo` | 조치 후 처음부터 다시 실행할 app 배포 workflow repository |
 | `APP_DEPLOY_WORKFLOW_FILE` | `backend-api-ci.yml` | Terraform variable `app_deploy_workflow_file` | 조치 후 다시 실행할 app 배포 workflow |
 | `APP_DEPLOY_WORKFLOW_REF` | `main` | Terraform variable `app_deploy_workflow_ref` | app 배포 workflow 실행 branch/ref |

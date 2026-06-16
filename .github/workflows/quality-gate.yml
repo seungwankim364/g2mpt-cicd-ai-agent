@@ -18,6 +18,13 @@ on:
       image_tag:
         required: true
         type: string
+    secrets:
+      PROMETHEUS_URL:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: true
+      AWS_ROLE_ARN:
+        required: false
   workflow_dispatch:
     inputs:
       service:
