@@ -40,6 +40,7 @@
 | DOC-32 | [GitHub Secrets and Runtime Values](20-implementation/27-github-secrets-and-runtime-values.md) | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 정리 |
 | DOC-33 | [Pre-Apply Verification Checklist](20-implementation/28-pre-apply-verification-checklist.md) | apply 전 Terraform, dispatch workflow, Slack signing secret 점검 |
 | DOC-34 | [Dashboard Control Center Checklist](20-implementation/29-dashboard-control-center-checklist.md) | dashboard local backend, 버튼, live 연결 체크리스트 |
+| DOC-35 | [Final Status and User Checklist](20-implementation/30-final-status-and-user-checklist.md) | 지금까지 완료된 것, 남은 것, 사용자가 해야 할 일 |
 
 ## 30. Presentation
 

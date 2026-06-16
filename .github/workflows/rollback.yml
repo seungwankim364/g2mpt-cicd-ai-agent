@@ -28,11 +28,11 @@ on:
       target_repo:
         required: false
         default: hj-3/gympt-gitops
-        description: Repository that owns GitOps rollback workflow and GITOPS_PAT
+        description: Repository that owns the GitOps rollback workflow and GITOPS_PAT
       target_workflow:
         required: false
         default: rollback.yml
-        description: Workflow file in target_repo that performs GitOps rollback
+        description: Workflow file in target_repo that updates GitOps values
       app_repo:
         required: false
         default: hj-3/gympt-app
@@ -66,7 +66,7 @@ jobs:
           test "${{ inputs.action_type }}" = "rollback"
           test -n "${{ inputs.target_image_tag }}"
           if [ -z "$DISPATCH_TOKEN" ]; then
-            echo "GH_WORKFLOW_DISPATCH_TOKEN is required to call the existing GitOps rollback workflow." >&2
+            echo "GH_WORKFLOW_DISPATCH_TOKEN is required to call the GitOps rollback workflow." >&2
             exit 2
           fi
 
@@ -87,12 +87,12 @@ jobs:
               "targetRepo": "${{ inputs.target_repo }}",
               "targetWorkflow": "${{ inputs.target_workflow }}",
               "startedAt": datetime.now(timezone.utc).isoformat(),
-              "status": "dispatching_existing_gitops_rollback_workflow"
+              "status": "dispatching_gitops_rollback_workflow"
           }
           open("rollback-request.json", "w", encoding="utf-8").write(json.dumps(record, indent=2) + "\n")
           PY
 
-      - name: Dispatch existing GitOps rollback workflow
+      - name: Dispatch GitOps rollback workflow
         run: |
           scripts/github/dispatch-workflow.py \
             --repo "$TARGET_REPO" \

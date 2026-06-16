@@ -21,6 +21,115 @@ gympt-ops를 참고한 경우 반드시 "read-only"라고 명시한다.
 
 ## 2026-06-16
 
+### 2026-06-16 11:05 - gympt-gitops rollback workflow 실제 추가
+
+작업:
+
+```text
+사용자 확인 후, 기존 PAT가 gympt-gitops에 있으므로 실제 rollback workflow를 gympt-gitops에 추가했다.
+추가한 workflow는 workflow_dispatch 전용이라 push/merge만으로 자동 실행되지 않는다.
+실행될 때만 charts/backend-api/values-prod.yaml image.tag를 target_image_tag로 변경하고 commit/push한다.
+```
+
+추가 파일:
+
+```text
+../gympt-ops/gympt-gitops/.github/workflows/rollback.yml
+```
+
+수정 파일:
+
+```text
+README.md
+docs/20-implementation/25-rollback-workflow-design.md
+docs/20-implementation/27-github-secrets-and-runtime-values.md
+docs/20-implementation/28-pre-apply-verification-checklist.md
+docs/20-implementation/30-final-status-and-user-checklist.md
+work-log.md
+```
+
+영향:
+
+```text
+자동 실행 트리거가 없으므로 팀원 서비스에는 즉시 영향 없음.
+Slack 승인 또는 GitHub workflow_dispatch로 호출될 때만 prod values image tag를 변경함.
+GITOPS_PAT 권한과 target_image_tag 입력값이 잘못되면 rollback workflow가 실패하거나 잘못된 tag로 rollback될 수 있으므로 실제 호출 전 smoke test가 필요함.
+```
+
+검증:
+
+```text
+gympt-gitops rollback workflow YAML parse 통과
+gympt-gitops git status 기준 신규 파일은 .github/workflows/rollback.yml 하나
+```
+
+### 2026-06-16 10:45 - gympt-gitops rollback workflow 부재 반영
+
+작업:
+
+```text
+../gympt-ops/gympt-gitops를 read-only로 확인했다.
+gympt-gitops에는 .github/workflows 디렉터리와 rollback.yml이 없음을 확인했다.
+기존 rollback.yml이 "기존 GitOps rollback workflow dispatch"를 전제로 하던 부분을 재검토했다.
+사용자 확인 결과 PAT는 이미 gympt-gitops repo에 있으므로, cd-quality-gate가 GitOps values를 직접 push하는 방식은 맞지 않다고 판단했다.
+rollback dispatch 대상 기본값을 hj-3/gympt-gitops로 맞췄다.
+나중에 gympt-gitops에 붙일 rollback workflow 템플릿을 integration-templates/gympt-gitops/.github/workflows/rollback.yml에 추가했다.
+```
+
+수정 파일:
+
+```text
+.github/workflows/rollback.yml
+README.md
+docs/20-implementation/25-rollback-workflow-design.md
+docs/20-implementation/28-pre-apply-verification-checklist.md
+docs/20-implementation/30-final-status-and-user-checklist.md
+dashboard/src/data/sample-dashboard.js
+integration-templates/gympt-gitops/.github/workflows/rollback.yml
+work-log.md
+```
+
+주의:
+
+```text
+gympt-ops 파일은 수정하지 않았다.
+cd-quality-gate의 GitHub dispatch token은 hj-3/gympt-gitops rollback workflow를 호출할 수 있어야 한다.
+실제 values commit은 gympt-gitops repo 안의 기존 GITOPS_PAT가 수행한다.
+DR은 여전히 실제 DR workflow 또는 명령 연결이 필요하다.
+```
+
+### 2026-06-16 10:30 - 최종 상태와 사용자 체크리스트 문서 추가
+
+작업:
+
+```text
+현재까지 파일 기준으로 확실히 완료된 항목과 아직 live 검증이 필요한 항목을 분리했다.
+기존 체크리스트 문서가 apply 전 점검과 dashboard 전용으로 나뉘어 있어, 전체 상태를 한눈에 보는 최종 체크리스트를 DOC-35로 추가했다.
+사용자가 해야 할 일, AWS 재생성 시 할 일, 서비스 복구 후 할 일, 퇴근 전 destroy 확인 항목을 분리했다.
+```
+
+추가 파일:
+
+```text
+docs/20-implementation/30-final-status-and-user-checklist.md
+```
+
+수정 파일:
+
+```text
+README.md
+docs/README.md
+docs/20-implementation/README.md
+work-log.md
+```
+
+검증:
+
+```text
+기존 DOC-33, DOC-34와 역할이 겹치지 않도록 확인했다.
+DOC-35는 최종 상태 요약과 사용자 액션 체크리스트 역할로 분리했다.
+```
+
 ### 2026-06-16 10:17 - Dashboard local backend와 버튼 action 연결
 
 작업:

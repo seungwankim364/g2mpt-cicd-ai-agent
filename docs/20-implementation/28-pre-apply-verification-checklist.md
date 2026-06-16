@@ -107,6 +107,10 @@ app_ref
 
 ```text
 rollback은 target_image_tag가 필수다.
+`../gympt-ops/gympt-gitops/.github/workflows/rollback.yml`을 추가했다.
+기존 PAT가 `gympt-gitops`에 있으므로, 실제 values commit은 해당 workflow가 수행한다.
+이 repo의 `GH_WORKFLOW_DISPATCH_TOKEN` 또는 AWS Secrets Manager의 GitHub dispatch token은 `hj-3/gympt-gitops` workflow_dispatch 호출 권한이 필요하다.
+실제 values commit은 `gympt-gitops` repo 안의 기존 `GITOPS_PAT`가 수행한다.
 dr/manual_fix/change는 target_image_tag가 비어 있을 수 있으므로 executor가 currentImageTag로 fallback한다.
 workflow 파일이 실제 GitHub repository에 존재하는지는 apply 후 GitHub API dispatch smoke test로 최종 확인한다.
 ```

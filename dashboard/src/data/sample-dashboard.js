@@ -113,7 +113,7 @@ export const sampleDashboard = {
     ]
   },
   approvals: [
-    { action: "rollback", status: "waiting", approver: "-", target: "backend-api:def5678", workflow: "rollback.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
+    { action: "rollback", status: "waiting", approver: "-", target: "backend-api:def5678", workflow: "rollback.yml", repo: "hj-3/gympt-gitops", detail: "uses existing GITOPS_PAT in GitOps repo" },
     { action: "dr", status: "available", approver: "-", target: "secondary path", workflow: "dr-failover.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
     { action: "manual_fix", status: "available", approver: "-", target: "issue + redeploy", workflow: "manual-fix.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
     { action: "change", status: "available", approver: "-", target: "approved change", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" }

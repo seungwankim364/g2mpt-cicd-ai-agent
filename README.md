@@ -66,7 +66,7 @@ Existing gympt-ops CI/CD
 | Slack 배포 완료 알림 | [scripts/quality-gate/send-slack-deploy-success.py](scripts/quality-gate/send-slack-deploy-success.py) | Quality Gate 통과 후 배포 완료 payload 생성 또는 전송 |
 | EventBridge 발행 | [scripts/quality-gate/publish-eventbridge-event.sh](scripts/quality-gate/publish-eventbridge-event.sh) | `DeploymentFailed` 이벤트 payload 생성/발행 |
 | Slack 승인 자동 실행 | [lambda/slack-approval-handler](lambda/slack-approval-handler), [lambda/deployment-action-executor](lambda/deployment-action-executor) | Slack 승인 버튼 수신 후 rollback/DR/manual fix/change workflow 자동 dispatch |
-| Rollback 요청 workflow | [.github/workflows/rollback.yml](.github/workflows/rollback.yml) | 승인 후 기존 GitOps/PAT 보유 repo의 rollback workflow를 호출 |
+| Rollback 요청 workflow | [.github/workflows/rollback.yml](.github/workflows/rollback.yml) | 승인 후 기존 PAT가 있는 `gympt-gitops` rollback workflow를 호출 |
 | DR 요청 workflow | [.github/workflows/dr-failover.yml](.github/workflows/dr-failover.yml) | 승인 후 기존 권한 보유 repo의 DR failover workflow를 자동 호출 |
 | Manual fix workflow | [.github/workflows/manual-fix.yml](.github/workflows/manual-fix.yml) | 승인 후 수동 조치 이슈와 실행 기록 생성 |
 | Change apply workflow | [.github/workflows/change-apply.yml](.github/workflows/change-apply.yml) | 승인 후 change 실행 기록과 이슈 생성 |
@@ -114,7 +114,7 @@ sqs-metrics
 
 Slack 2차 알림의 승인 버튼을 누르면 API Gateway가 `slack-approval-handler`를 호출하고, `DeploymentActionApproved` 이벤트를 거쳐 `deployment-action-executor`가 action type별 GitHub workflow를 자동 실행한다. 실제 rollback/DR 동작은 Terraform 변수에 지정한 대상 repository workflow가 수행한다.
 
-자동 rollback과 DR은 이 repo가 GitOps/AWS 운영 리소스를 직접 수정하지 않고, 기존 권한이 있는 GitOps/gympt-ops 쪽 workflow를 호출한다. manual fix/change는 현재 이 repo의 workflow가 승인 기록과 후속 작업을 자동 생성한다.
+자동 rollback은 기존 PAT가 있는 `hj-3/gympt-gitops` repo의 rollback workflow를 호출하는 방식으로 맞춘다. 실제 `gympt-gitops/.github/workflows/rollback.yml`을 추가했으며, 이 workflow는 `workflow_dispatch` 전용이라 push만으로 자동 실행되지 않는다. DR은 아직 실제 전환 workflow가 없으면 대상 repo workflow를 새로 만들거나 이 repo workflow에 실제 DR 명령을 연결해야 한다. manual fix/change는 현재 이 repo의 workflow가 승인 기록과 후속 작업을 자동 생성한다.
 
 각 승인 action workflow는 조치 요청 이후 `gympt-app` 배포 workflow를 다시 dispatch한다. 기존 app 배포 workflow는 배포 완료 후 `cd-quality-gate-architecture`의 `quality-gate.yml`을 호출해야 하며, Quality Gate가 통과하면 Slack `#cd-deploy-alarm`으로 배포 완료 알림을 보낸다.
 
@@ -226,6 +226,7 @@ scripts/aws/destroy-terraform-stack.sh --execute
 | DOC-32 | [GitHub Secrets and Runtime Values](docs/20-implementation/27-github-secrets-and-runtime-values.md) | 실제 연결 전 GitHub Secrets, AWS Secrets Manager, runtime 값 정리 |
 | DOC-33 | [Pre-Apply Verification Checklist](docs/20-implementation/28-pre-apply-verification-checklist.md) | apply 전 Terraform, dispatch workflow, Slack signing secret 점검 |
 | DOC-34 | [Dashboard Control Center Checklist](docs/20-implementation/29-dashboard-control-center-checklist.md) | dashboard local backend, 버튼, live 연결 체크리스트 |
+| DOC-35 | [Final Status and User Checklist](docs/20-implementation/30-final-status-and-user-checklist.md) | 지금까지 완료된 것, 남은 것, 사용자가 해야 할 일 |
 
 ### 30. Presentation
 
