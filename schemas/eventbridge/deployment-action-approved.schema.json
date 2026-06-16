@@ -20,7 +20,21 @@
         "deploymentId": { "type": "string" },
         "service": { "type": "string" },
         "environment": { "type": "string", "enum": ["dev", "staging", "prod"] },
-        "actionType": { "type": "string", "enum": ["rollback", "dr", "manual_fix", "change"] },
+        "actionType": {
+          "type": "string",
+          "enum": [
+            "rollback",
+            "dr",
+            "manual_fix",
+            "change",
+            "restart_deployment",
+            "scale_replicas",
+            "increase_memory",
+            "increase_hpa",
+            "open_fix_issue",
+            "open_change_pr"
+          ]
+        },
         "approvedBy": { "type": "string" },
         "approvedAt": { "type": "string" },
         "reason": { "type": "string" },

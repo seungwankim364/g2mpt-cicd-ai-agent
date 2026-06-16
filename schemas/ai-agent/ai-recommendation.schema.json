@@ -15,7 +15,20 @@
       "type": "object",
       "required": ["type", "reason", "requiresApproval"],
       "properties": {
-        "type": { "type": "string", "enum": ["rollback", "manual_fix", "dr", "observe"] },
+        "type": {
+          "type": "string",
+          "enum": [
+            "rollback",
+            "dr",
+            "restart_deployment",
+            "scale_replicas",
+            "increase_memory",
+            "increase_hpa",
+            "open_fix_issue",
+            "open_change_pr",
+            "observe"
+          ]
+        },
         "reason": { "type": "string" },
         "requiresApproval": { "const": true }
       }
@@ -27,4 +40,3 @@
     "slackMessage": { "type": "object" }
   }
 }
-

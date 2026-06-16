@@ -17,7 +17,17 @@ BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION", os.environ.get("AWS_REGION", "ap-northeast-2"))
 BEDROCK_MAX_TOKENS = int(os.environ.get("BEDROCK_MAX_TOKENS", "1200"))
 
-ALLOWED_ACTIONS = {"rollback", "manual_fix", "dr", "observe"}
+ALLOWED_ACTIONS = {
+    "rollback",
+    "dr",
+    "restart_deployment",
+    "scale_replicas",
+    "increase_memory",
+    "increase_hpa",
+    "open_fix_issue",
+    "open_change_pr",
+    "observe",
+}
 
 
 def _compact_summary(summary: dict) -> dict:
@@ -44,9 +54,15 @@ def _prompt(summary: dict) -> str:
         [
             "Analyze this CD Quality Gate deployment failure.",
             "Use only the provided evidence. Do not invent logs, metrics, or root causes.",
-            "Choose exactly one recommendedAction.type from: rollback, manual_fix, dr, observe.",
+            "Choose exactly one recommendedAction.type from: rollback, dr, restart_deployment, scale_replicas, increase_memory, increase_hpa, open_fix_issue, open_change_pr, observe.",
             "Use rollback only when the evidence points to the new deployment as the likely cause.",
             "Use dr when infrastructure or dependency failure is broader than one deploy.",
+            "Use restart_deployment for pod restart or stuck rollout symptoms when the image is not clearly bad.",
+            "Use scale_replicas for traffic/latency pressure that can be mitigated by more pods.",
+            "Use increase_memory for OOM, heap, memory pressure, or memory-limit symptoms.",
+            "Use increase_hpa for sustained CPU/load pressure when HPA maxReplicas is the likely limiter.",
+            "Use open_fix_issue when code or configuration must be changed by a developer.",
+            "Use open_change_pr when a controlled GitOps/Terraform change is needed but the exact value requires review.",
             "Always set recommendedAction.requiresApproval to true.",
             "Return JSON only. Do not wrap the JSON in markdown.",
             "",
@@ -69,7 +85,7 @@ def _prompt(summary: dict) -> str:
                         }
                     ],
                     "recommendedAction": {
-                        "type": "rollback|manual_fix|dr|observe",
+                        "type": "rollback|dr|restart_deployment|scale_replicas|increase_memory|increase_hpa|open_fix_issue|open_change_pr|observe",
                         "reason": "string",
                         "requiresApproval": True,
                     },

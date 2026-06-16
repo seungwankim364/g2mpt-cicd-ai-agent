@@ -42,7 +42,6 @@ jobs:
       issues: write
 
     env:
-      DISPATCH_TOKEN: ${{ secrets.GH_WORKFLOW_DISPATCH_TOKEN }}
       APP_REPO: ${{ inputs.app_repo }}
       APP_WORKFLOW: ${{ inputs.app_workflow }}
       APP_REF: ${{ inputs.app_ref }}
@@ -53,11 +52,14 @@ jobs:
 
       - name: Validate manual fix approval
         run: |
-          test "${{ inputs.action_type }}" = "manual_fix"
-          if [ -z "$DISPATCH_TOKEN" ]; then
-            echo "GH_WORKFLOW_DISPATCH_TOKEN is required to call the app deployment workflow." >&2
-            exit 2
-          fi
+          case "${{ inputs.action_type }}" in
+            manual_fix|open_fix_issue)
+              ;;
+            *)
+              echo "Unsupported action_type: ${{ inputs.action_type }}" >&2
+              exit 2
+              ;;
+          esac
 
       - name: Create manual fix record
         run: |
@@ -68,12 +70,17 @@ jobs:
               "deploymentId": "${{ inputs.deployment_id }}",
               "service": "${{ inputs.service }}",
               "environment": "${{ inputs.environment }}",
-              "actionType": "manual_fix",
+              "actionType": "${{ inputs.action_type }}",
               "approvedBy": "${{ inputs.approved_by }}",
               "reason": "${{ inputs.reason }}",
               "currentImageTag": "${{ inputs.current_image_tag }}",
+              "targetImageTag": "${{ inputs.target_image_tag }}",
+              "appRepo": "${{ inputs.app_repo }}",
+              "appWorkflow": "${{ inputs.app_workflow }}",
+              "appRef": "${{ inputs.app_ref }}",
               "startedAt": datetime.now(timezone.utc).isoformat(),
-              "status": "manual_fix_requested"
+              "status": "fix_issue_requested",
+              "nextExecutor": "create and merge the fix in the app repo, then let normal CI/CD restart from gympt-app"
           }
           open("manual-fix-request.json", "w", encoding="utf-8").write(json.dumps(record, indent=2) + "\n")
           PY
@@ -87,19 +94,6 @@ jobs:
             --body-file manual-fix-request.json \
             --label "cd-quality-gate" \
             --label "manual-fix" || true
-
-      - name: Dispatch gympt-app deployment workflow
-        run: |
-          scripts/github/dispatch-workflow.py \
-            --repo "$APP_REPO" \
-            --workflow "$APP_WORKFLOW" \
-            --ref "$APP_REF" \
-            --token "$DISPATCH_TOKEN" \
-            --input "service=${{ inputs.service }}" \
-            --input "environment=${{ inputs.environment }}" \
-            --input "image_tag=${{ inputs.target_image_tag }}" \
-            --input "source_action=manual_fix" \
-            --input "deployment_id=${{ inputs.deployment_id }}"
 
       - name: Upload manual fix record
         uses: actions/upload-artifact@v4

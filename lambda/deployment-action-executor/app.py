@@ -19,6 +19,12 @@ WORKFLOW_REPOS = {
     "dr": os.environ.get("DR_WORKFLOW_REPO", ""),
     "manual_fix": os.environ.get("MANUAL_FIX_WORKFLOW_REPO", ""),
     "change": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
+    "restart_deployment": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
+    "scale_replicas": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
+    "increase_memory": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
+    "increase_hpa": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
+    "open_fix_issue": os.environ.get("MANUAL_FIX_WORKFLOW_REPO", ""),
+    "open_change_pr": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
 }
 
 WORKFLOW_FILES = {
@@ -26,6 +32,12 @@ WORKFLOW_FILES = {
     "dr": os.environ.get("DR_WORKFLOW_FILE", "dr-failover.yml"),
     "manual_fix": os.environ.get("MANUAL_FIX_WORKFLOW_FILE", "manual-fix.yml"),
     "change": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),
+    "restart_deployment": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),
+    "scale_replicas": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),
+    "increase_memory": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),
+    "increase_hpa": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),
+    "open_fix_issue": os.environ.get("MANUAL_FIX_WORKFLOW_FILE", "manual-fix.yml"),
+    "open_change_pr": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),
 }
 
 

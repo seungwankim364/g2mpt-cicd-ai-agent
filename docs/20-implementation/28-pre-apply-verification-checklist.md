@@ -111,6 +111,8 @@ rollback은 이 repo의 `.github/workflows/rollback.yml`이 `hj-3/gympt-gitops/c
 따라서 이 repo의 GitHub Secret `GH_WORKFLOW_DISPATCH_TOKEN`은 `hj-3/gympt-gitops` contents write 권한이 필요하다.
 AWS Secrets Manager의 GitHub dispatch token은 이 repo의 rollback workflow를 workflow_dispatch 할 수 있어야 한다.
 dr/manual_fix/change는 target_image_tag가 비어 있을 수 있으므로 executor가 currentImageTag로 fallback한다.
+dr/manual_fix/change workflow는 현재 요청 기록, artifact, GitHub issue 생성까지 수행한다.
+dr/manual_fix/change의 실제 운영 실행 명령은 아직 자동 연결하지 않는다.
 workflow 파일이 실제 GitHub repository에 존재하는지는 apply 후 GitHub API dispatch smoke test로 최종 확인한다.
 ```
 

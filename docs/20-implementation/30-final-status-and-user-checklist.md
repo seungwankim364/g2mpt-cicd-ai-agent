@@ -346,15 +346,19 @@ slack_interactivity_url
 
 ### 4.7 실제 조치 자동화 수준 확인
 
-현재 rollback/DR/change/manual_fix는 승인 후 dispatch 구조까지 있다.
+현재 rollback은 승인 후 실제 GitOps image tag 변경까지 자동화되어 있다.
+DR/change/manual_fix는 승인 후 요청 기록, artifact, GitHub issue 생성까지 수행한다.
+실제 실행 명령은 아직 연결하지 않는 것이 현재 기준이다.
 
 남은 확인:
 
 ```text
 [ ] rollback workflow가 실제 GitOps image tag를 이전 tag로 되돌리는지 확인
-[ ] DR workflow가 실제 DR 전환을 수행하는지 확인
-[ ] manual_fix workflow가 실제 조치 흐름과 연결되는지 확인
-[ ] change workflow가 실제 승인된 변경 실행 흐름과 연결되는지 확인
+[ ] DR 요청 workflow가 issue/artifact를 생성하는지 확인
+[ ] manual_fix workflow가 issue/artifact를 생성하는지 확인
+[ ] change workflow가 issue/artifact를 생성하는지 확인
+[ ] DR 실제 전환 runbook/workflow를 별도 설계할지 결정
+[ ] manual_fix/change를 app PR, GitOps PR, Terraform PR 중 어느 경로로 실행할지 결정
 ```
 
 ## 5. 사용자가 해야 할 일

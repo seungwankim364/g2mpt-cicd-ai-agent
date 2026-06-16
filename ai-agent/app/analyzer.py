@@ -16,6 +16,29 @@ def _summary(alert: dict) -> str:
     return alert.get("summary") or alert.get("annotations", {}).get("summary", "")
 
 
+def _recommended_action(alerts: list[dict], signals: list[dict]) -> tuple[str, str]:
+    names = {_alert_name(alert) for alert in alerts}
+    severities = {_alert_severity(alert) for alert in alerts}
+
+    if "BackendHighMemoryUsage" in names:
+        return "increase_memory", "Memory pressure is visible during the deploy window."
+    if "BackendPodRestarting" in names or "PodRestartFrequent" in names:
+        return "restart_deployment", "Pod restart or rollout instability is visible."
+    if "BackendHighLatency" in names and not {"BackendHighErrorRate", "BackendDBPoolExhaustion"} & names:
+        return "scale_replicas", "Latency pressure can be mitigated by more backend pods."
+    if "NodeHighCPUUsage" in names:
+        return "increase_hpa", "Cluster or pod CPU pressure suggests HPA headroom should be increased."
+    if "BackendDBPoolExhaustion" in names:
+        return "open_change_pr", "DB pool pressure needs a controlled configuration change."
+    if {"RedisConnectionError", "SQSMessageAge", "SQSQueueBacklog", "SQSDLQMessages"} & names:
+        return "dr", "Dependency or data-plane alerts indicate a broader failure than one pod."
+    if "WAFBlockedRequestSpike" in names:
+        return "open_fix_issue", "WAF behavior needs rule/config review before a safe change."
+    if any(severity == "critical" for severity in severities):
+        return "rollback", "Critical deployment-related alerts are firing."
+    return "observe", "No automatic runbook has strong enough evidence."
+
+
 def analyze(payload: dict) -> dict:
     deployment = payload.get("deployment") or payload
     alerts = payload.get("prometheus", {}).get("alerts") or payload.get("alerts", [])
@@ -39,9 +62,7 @@ def analyze(payload: dict) -> dict:
             }
         )
 
-    action_type = "rollback" if any(_alert_severity(alert) == "critical" for alert in alerts) else "observe"
-    if any(_alert_name(alert) == "WAFBlockedRequestSpike" for alert in alerts):
-        action_type = "manual_fix"
+    action_type, action_reason = _recommended_action(alerts, signals)
 
     service = deployment.get("service", "unknown-service")
     deployment_id = deployment.get("deploymentId", payload.get("deploymentId", "unknown-deployment"))
@@ -57,18 +78,18 @@ def analyze(payload: dict) -> dict:
         "causeCandidates": candidates,
         "recommendedAction": {
             "type": action_type,
-            "reason": "Critical deployment-related alerts are firing." if action_type == "rollback" else "Manual review is safer based on available evidence.",
+            "reason": action_reason,
             "requiresApproval": True,
         },
         "nextSteps": [
             "Open Grafana dashboard",
             "Review Athena summary",
-            "Run matched runbook",
-            "Approve rollback only after operator review",
+            "Run matched runbook after operator approval",
+            "Re-run Quality Gate after the approved action",
         ],
         "slackMessage": {
             "title": "Deployment failure analysis completed",
             "body": f"{summary} Recommended action: {action_type}",
-            "actionButtons": ["Approve rollback", "Open Grafana", "Open Argo CD"],
+            "actionButtons": [f"Approve {action_type}", "Open Grafana", "Open Argo CD"],
         },
     }

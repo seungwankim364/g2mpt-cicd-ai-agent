@@ -23,7 +23,7 @@ export const sampleDashboard = {
     { id: "argocd", label: "Argo CD sync", owner: "Argo CD", status: "complete", at: "15:23", detail: "backend-api-prod synced" },
     { id: "gate", label: "Quality Gate", owner: "cd-quality-gate", status: "failed", at: "15:28", detail: "5 minute health window failed" },
     { id: "event", label: "DeploymentFailed", owner: "EventBridge", status: "complete", at: "15:28", detail: "event published to cd-quality-gate-prod-bus" },
-    { id: "ai", label: "Bedrock analysis", owner: "Lambda", status: "complete", at: "15:29", detail: "rollback recommended" },
+    { id: "ai", label: "Bedrock analysis", owner: "Lambda", status: "complete", at: "15:29", detail: "increase_memory recommended" },
     { id: "approval", label: "Approval action", owner: "Slack", status: "waiting", at: "now", detail: "operator decision pending" },
     { id: "redeploy", label: "Redeploy and verify", owner: "gympt-app", status: "pending", at: "-", detail: "runs after approved action" }
   ],
@@ -98,7 +98,7 @@ export const sampleDashboard = {
     engine: "Amazon Bedrock",
     model: "anthropic.claude-3-haiku-20240307-v1:0",
     confidence: 0.82,
-    recommendedAction: "rollback",
+    recommendedAction: "increase_memory",
     severity: "critical",
     summary: "The failure started immediately after the backend-api image tag changed. Error rate, latency, and DB pool pressure increased together during the post-deploy window.",
     causeCandidates: [
@@ -107,16 +107,19 @@ export const sampleDashboard = {
       { title: "Queue backlog spillover", score: 0.41, evidence: "SQS message age exceeded threshold after API errors." }
     ],
     nextSteps: [
-      "Approve rollback to backend-api:def5678 if customer impact continues.",
-      "Check API latency and JVM dashboard during rollback.",
-      "Keep DR as fallback if Redis/SQS alerts continue after rollback."
+      "Approve increase_memory if heap pressure continues.",
+      "Check API latency and JVM dashboard during the GitOps patch.",
+      "Keep rollback as fallback if error rate continues after the runbook."
     ]
   },
   approvals: [
     { action: "rollback", status: "waiting", approver: "-", target: "backend-api:def5678", workflow: "rollback.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent", detail: "updates hj-3/gympt-gitops values tag directly" },
-    { action: "dr", status: "available", approver: "-", target: "secondary path", workflow: "dr-failover.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
-    { action: "manual_fix", status: "available", approver: "-", target: "issue + redeploy", workflow: "manual-fix.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
-    { action: "change", status: "available", approver: "-", target: "approved change", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" }
+    { action: "restart_deployment", status: "available", approver: "-", target: "pod annotation bump", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
+    { action: "scale_replicas", status: "available", approver: "-", target: "autoscaling.minReplicas=2", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
+    { action: "increase_memory", status: "available", approver: "-", target: "memory request/limit", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
+    { action: "increase_hpa", status: "available", approver: "-", target: "autoscaling.maxReplicas=30", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
+    { action: "open_fix_issue", status: "available", approver: "-", target: "fix issue", workflow: "manual-fix.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
+    { action: "dr", status: "available", approver: "-", target: "configured DR GitOps patch", workflow: "dr-failover.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" }
   ],
   infra: {
     terraformState: "destroyed",

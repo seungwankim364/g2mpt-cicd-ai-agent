@@ -2128,3 +2128,122 @@ scripts/test-local.sh 통과
 slack-first-alert.json에 Grafana, Prometheus Alerts, Argo CD 링크 포함 확인
 GitHub Actions 링크는 실제 workflow 실행 시 GITHUB_RUN_URL 환경값으로 포함됨
 ```
+### 2026-06-16 14:47 - DR/manual fix/change 승인 흐름 정리
+
+작업:
+
+```text
+rollback은 승인 후 GitOps image tag를 직접 되돌리는 자동 조치로 유지했다.
+DR/manual fix/change는 승인 후 바로 외부 workflow나 app deploy workflow를 호출하지 않도록 정리했다.
+DR/manual fix/change는 요청 기록 JSON, artifact, GitHub issue 생성까지만 수행하도록 변경했다.
+Lambda executor가 넘기는 app_repo/app_workflow/app_ref input과의 호환성은 유지했다.
+README와 세부 흐름 문서, pre-apply checklist, final checklist에 action별 자동화 수준을 반영했다.
+```
+
+수정 파일:
+
+```text
+.github/workflows/dr-failover.yml
+.github/workflows/manual-fix.yml
+.github/workflows/change-apply.yml
+README.md
+docs/20-implementation/28-pre-apply-verification-checklist.md
+docs/20-implementation/30-final-status-and-user-checklist.md
+docs/20-implementation/31-gympt-app-to-gitops-to-quality-gate-flow.md
+work-log.md
+```
+
+현재 기준:
+
+```text
+rollback: 승인 후 자동 GitOps tag rollback
+dr: 승인 후 DR review issue/artifact 생성
+manual_fix: 승인 후 manual fix issue/artifact 생성
+change: 승인 후 change review issue/artifact 생성
+```
+
+### 2026-06-16 14:58 - Dashboard backend/DB 연결 표시 및 실행 확인
+
+작업:
+
+```text
+dashboard backend 서버를 5174 포트로 실행했다.
+기존 5173 포트는 이미 사용 중이어서 DASHBOARD_PORT=5174로 띄웠다.
+dashboard 서버에 /api/status endpoint를 추가했다.
+dashboard 화면 상단에 Backend API, Action DB, Terraform Adapter 연결 상태 패널을 추가했다.
+Action DB는 현재 dashboard/runtime/actions.json 파일 저장소를 사용한다.
+브라우저에서 http://localhost:5174 URL을 열었다.
+```
+
+수정 파일:
+
+```text
+dashboard/server.mjs
+dashboard/src/main.js
+dashboard/src/styles.css
+work-log.md
+```
+
+검증:
+
+```text
+GET /api/status 정상 응답
+GET /api/dashboard 정상 응답
+GET / 정상 응답
+Backend API status: connected
+Action DB status: connected
+Terraform Adapter status: connected
+```
+
+### 2026-06-16 15:13 - DR/manual fix/change runbook action 자동화
+
+작업:
+
+```text
+manual_fix/change를 구체 runbook action으로 세분화했다.
+Bedrock prompt와 local analyzer가 rollback/dr/restart_deployment/scale_replicas/increase_memory/increase_hpa/open_fix_issue/open_change_pr/observe 중 하나를 추천하도록 변경했다.
+Slack 승인 action value와 deployment-action-executor가 새 action type을 dispatch할 수 있게 확장했다.
+change-apply.yml이 restart_deployment, scale_replicas, increase_memory, increase_hpa를 GitOps values patch로 자동 실행하도록 변경했다.
+dr-failover.yml은 DR_VALUES_FILE/DR_YAML_PATH/DR_TARGET_VALUE가 설정된 경우 GitOps failover patch를 실행하고, 없으면 DR issue/artifact로 멈추게 했다.
+dashboard action 목록에 세부 runbook action을 반영했다.
+깨진 dashboard/runtime/actions.json을 복구하고, dashboard backend가 손상된 local DB를 만나도 죽지 않도록 방어 로직을 추가했다.
+```
+
+추가 파일:
+
+```text
+scripts/cd/update-gitops-yaml-value.sh
+```
+
+수정 파일:
+
+```text
+.github/workflows/approved-action.yml
+.github/workflows/change-apply.yml
+.github/workflows/dr-failover.yml
+.github/workflows/manual-fix.yml
+ai-agent/app/analyzer.py
+dashboard/server.mjs
+dashboard/src/data/sample-dashboard.js
+lambda/analysis-orchestrator/bedrock_agent.py
+lambda/deployment-action-executor/app.py
+schemas/ai-agent/ai-recommendation.schema.json
+schemas/eventbridge/deployment-action-approved.schema.json
+scripts/quality-gate/publish-approved-action-event.sh
+README.md
+docs/20-implementation/31-gympt-app-to-gitops-to-quality-gate-flow.md
+work-log.md
+```
+
+검증:
+
+```text
+GitHub Actions YAML parse 통과
+python3 -m compileall ai-agent lambda 통과
+scripts/test-local.sh 통과
+scripts/lambda/package-analysis-orchestrator.sh 통과
+update-gitops-yaml-value.sh dry-run 통과
+dashboard /api/status 통과
+dashboard /api/actions increase_memory 기록 통과
+pytest는 현재 환경에 설치되어 있지 않아 실행하지 못함
+```

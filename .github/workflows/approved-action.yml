@@ -12,6 +12,12 @@ on:
           - dr
           - manual_fix
           - change
+          - restart_deployment
+          - scale_replicas
+          - increase_memory
+          - increase_hpa
+          - open_fix_issue
+          - open_change_pr
       deployment_id:
         description: Deployment id from AI analysis
         required: true

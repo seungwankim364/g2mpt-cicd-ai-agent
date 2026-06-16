@@ -796,6 +796,41 @@ GitHub Secret GH_WORKFLOW_DISPATCH_TOKEN:
 
 ## 13. DR/manual fix/change 흐름
 
+이제 `manual_fix/change`는 큰 버튼 하나가 아니라 실행 가능한 runbook action으로 쪼갠다.
+
+```text
+restart_deployment
+  -> GitOps values podAnnotations.cd-quality-gate/restartedAt 갱신
+  -> Argo CD sync
+  -> pod template 변경으로 rollout restart 유도
+
+scale_replicas
+  -> GitOps values autoscaling.minReplicas=2 갱신
+  -> Argo CD sync
+  -> 최소 pod 수 증가
+
+increase_memory
+  -> GitOps values resources.requests.memory=2Gi
+  -> GitOps values resources.limits.memory=3Gi
+  -> Argo CD sync
+  -> 메모리 여유 증가
+
+increase_hpa
+  -> GitOps values autoscaling.maxReplicas=30 갱신
+  -> Argo CD sync
+  -> HPA 상한 증가
+
+open_fix_issue
+  -> manual-fix.yml
+  -> GitHub issue/artifact 생성
+  -> gympt-app fix PR로 연결
+
+open_change_pr
+  -> change-apply.yml
+  -> GitHub issue/artifact 생성
+  -> GitOps/Terraform/app PR 중 하나로 연결
+```
+
 DR:
 
 ```text
@@ -805,8 +840,9 @@ DR:
 현재 상태:
 
 ```text
-승인 기록과 downstream dispatch scaffold는 있다.
-실제 DR 전환 명령은 아직 연결 전이다.
+DR_VALUES_FILE, DR_YAML_PATH, DR_TARGET_VALUE repository variable이 설정되어 있으면
+scripts/cd/update-gitops-yaml-value.sh로 GitOps DR failover 값을 자동 갱신한다.
+값이 없으면 DR review issue/artifact만 생성하고 멈춘다.
 ```
 
 manual fix:
@@ -818,8 +854,10 @@ manual fix:
 현재 상태:
 
 ```text
-승인 기록과 issue 생성 중심이다.
-실제 코드 수정 자동화는 아니다.
+manual_fix 또는 open_fix_issue action을 받는다.
+승인 기록, artifact, GitHub issue를 생성한다.
+코드 수정이 필요한 경우 gympt-app fix PR을 만들고
+기존 gympt-app -> gympt-gitops -> Argo CD -> Quality Gate 흐름을 다시 탄다.
 ```
 
 change:
@@ -831,8 +869,9 @@ change:
 현재 상태:
 
 ```text
-승인된 change 실행 기록과 후속 작업 생성 중심이다.
-실제 운영 변경 명령은 연결 필요하다.
+change-apply.yml이 아래 action을 직접 처리한다.
+restart_deployment, scale_replicas, increase_memory, increase_hpa는 GitOps values를 자동 patch한다.
+change/open_change_pr은 승인 기록과 issue/artifact를 만든다.
 ```
 
 ## 14. Terraform이 만드는 AWS 연결

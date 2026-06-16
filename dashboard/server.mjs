@@ -11,6 +11,18 @@ const repoRoot = normalize(join(__dirname, ".."));
 const runtimeDir = join(__dirname, "runtime");
 const actionLogPath = join(runtimeDir, "actions.json");
 const port = Number(process.env.DASHBOARD_PORT || 5173);
+const allowedActions = [
+  "rollback",
+  "dr",
+  "manual_fix",
+  "change",
+  "restart_deployment",
+  "scale_replicas",
+  "increase_memory",
+  "increase_hpa",
+  "open_fix_issue",
+  "open_change_pr"
+];
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -34,7 +46,11 @@ async function requestBody(req) {
 
 async function readActions() {
   if (!existsSync(actionLogPath)) return [];
-  return JSON.parse(await readFile(actionLogPath, "utf-8"));
+  try {
+    return JSON.parse(await readFile(actionLogPath, "utf-8"));
+  } catch {
+    return [];
+  }
 }
 
 async function writeActions(actions) {
@@ -53,6 +69,27 @@ function terraformStateCount() {
   } catch {
     return null;
   }
+}
+
+function systemStatus(actions) {
+  return {
+    backend: {
+      status: "connected",
+      url: `http://localhost:${port}`,
+      api: "/api/dashboard"
+    },
+    database: {
+      status: "connected",
+      type: "file-json",
+      path: "dashboard/runtime/actions.json",
+      records: actions.length,
+      initialized: existsSync(actionLogPath)
+    },
+    terraform: {
+      status: terraformStateCount() === null ? "unavailable" : "connected",
+      workingDirectory: "infra/terraform"
+    }
+  };
 }
 
 function commandPlan(kind) {
@@ -86,7 +123,13 @@ function dispatchPayload(action, base = sampleDashboard) {
       rollback: "rollback.yml",
       dr: "dr-failover.yml",
       manual_fix: "manual-fix.yml",
-      change: "change-apply.yml"
+      change: "change-apply.yml",
+      restart_deployment: "change-apply.yml",
+      scale_replicas: "change-apply.yml",
+      increase_memory: "change-apply.yml",
+      increase_hpa: "change-apply.yml",
+      open_fix_issue: "manual-fix.yml",
+      open_change_pr: "change-apply.yml"
     }[action]
   };
 }
@@ -127,7 +170,9 @@ function mergeRuntime(base, actions) {
 
 async function dashboardData() {
   const actions = await readActions();
-  return mergeRuntime(sampleDashboard, actions);
+  const dashboard = mergeRuntime(sampleDashboard, actions);
+  dashboard.system = systemStatus(actions);
+  return dashboard;
 }
 
 async function serveStatic(req, res, pathname) {
@@ -162,11 +207,17 @@ async function route(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/status") {
+    const actions = await readActions();
+    json(res, 200, systemStatus(actions));
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/actions") {
     const body = await requestBody(req);
     const action = body.action;
-    if (!["rollback", "dr", "manual_fix", "change"].includes(action)) {
-      json(res, 400, { error: "action must be one of rollback, dr, manual_fix, change" });
+    if (!allowedActions.includes(action)) {
+      json(res, 400, { error: `action must be one of ${allowedActions.join(", ")}` });
       return;
     }
     const actions = await readActions();

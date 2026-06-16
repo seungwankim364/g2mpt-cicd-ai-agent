@@ -112,11 +112,11 @@ redis-metrics
 sqs-metrics
 ```
 
-Slack 2차 알림의 승인 버튼을 누르면 API Gateway가 `slack-approval-handler`를 호출하고, `DeploymentActionApproved` 이벤트를 거쳐 `deployment-action-executor`가 action type별 GitHub workflow를 자동 실행한다. 실제 rollback/DR 동작은 Terraform 변수에 지정한 대상 repository workflow가 수행한다.
+Slack 2차 알림의 승인 버튼을 누르면 API Gateway가 `slack-approval-handler`를 호출하고, `DeploymentActionApproved` 이벤트를 거쳐 `deployment-action-executor`가 action type별 GitHub workflow를 자동 실행한다. 실제 rollback은 `cd-quality-gate` workflow가 GitOps image tag를 직접 되돌리고, change runbook은 GitOps values를 자동 patch한다.
 
-자동 rollback은 `cd-quality-gate`의 `rollback.yml`이 `hj-3/gympt-gitops`의 `charts/backend-api/values-prod.yaml` image tag를 직접 이전 tag로 갱신하는 방식으로 맞춘다. 이 방식은 사용자가 `gympt-gitops` collaborator 권한을 갖고, `cd-quality-gate`에 저장한 PAT가 `gympt-gitops` contents write 권한을 갖는다는 전제다. DR은 아직 실제 전환 workflow가 없으면 대상 repo workflow를 새로 만들거나 이 repo workflow에 실제 DR 명령을 연결해야 한다. manual fix/change는 현재 이 repo의 workflow가 승인 기록과 후속 작업을 자동 생성한다.
+자동 rollback은 `cd-quality-gate`의 `rollback.yml`이 `hj-3/gympt-gitops`의 `charts/backend-api/values-prod.yaml` image tag를 직접 이전 tag로 갱신하는 방식으로 맞춘다. 이 방식은 사용자가 `gympt-gitops` collaborator 권한을 갖고, `cd-quality-gate`에 저장한 PAT가 `gympt-gitops` contents write 권한을 갖는다는 전제다. `restart_deployment`, `scale_replicas`, `increase_memory`, `increase_hpa`는 `change-apply.yml`이 GitOps values를 수정한다. DR은 `DR_VALUES_FILE`, `DR_YAML_PATH`, `DR_TARGET_VALUE` repository variable이 설정된 경우에만 GitOps failover patch를 실행한다.
 
-각 승인 action workflow는 조치 요청 이후 `gympt-app` 배포 workflow를 다시 dispatch한다. 기존 app 배포 workflow는 배포 완료 후 `cd-quality-gate-architecture`의 `quality-gate.yml`을 호출해야 하며, Quality Gate가 통과하면 Slack `#cd-deploy-alarm`으로 배포 완료 알림을 보낸다.
+rollback 이후에는 Argo CD가 GitOps tag 변경을 감지해 EKS를 되돌리고, 기존 app 배포 workflow는 배포 완료 후 `cd-quality-gate-architecture`의 `quality-gate.yml`을 호출해야 한다. Quality Gate가 통과하면 Slack `#cd-deploy-alarm`으로 배포 완료 알림을 보낸다.
 
 ServiceMonitor 정합성 확인 결과, 기존 `platform/monitoring/servicemonitor-backend-api.yaml`는 dev namespace인 `backend-api` 기준이지만, Helm chart 내부 ServiceMonitor template은 `.Release.Namespace`를 사용한다. `backend-api-prod` Application의 destination namespace는 `gympt-prod`이므로 Quality Gate는 `gympt-prod` 기준으로 평가한다.
 

@@ -12,7 +12,9 @@ const STATUS_LABELS = {
   destroyed: "Destroyed",
   preserved: "Preserved",
   blocked: "Blocked",
-  critical: "Critical"
+  critical: "Critical",
+  connected: "Connected",
+  unavailable: "Unavailable"
 };
 
 const statusClass = (status = "") => `status ${status.toLowerCase().replaceAll("_", "-")}`;
@@ -129,6 +131,35 @@ function renderOverview(data) {
   section.append(metricTile("Rollback tag", data.deployment.rollbackImageTag || "not set", "warn"));
   section.append(metricTile("Health window", `${data.healthWindow.durationSeconds / 60} min`, data.healthWindow.result === "failed" ? "danger" : "ok"));
   section.append(metricTile("AI confidence", pct(data.analysis.confidence), data.analysis.confidence > 0.75 ? "ok" : "warn"));
+  return section;
+}
+
+function renderSystemStatus(data) {
+  const section = createElement("section", "system-grid");
+  const system = data.system || {};
+  const backend = system.backend || { status: "unavailable", url: "-", api: "-" };
+  const database = system.database || { status: "unavailable", type: "-", records: 0, path: "-" };
+  const terraform = system.terraform || { status: "unavailable", workingDirectory: "-" };
+
+  const backendCard = createElement("article", "system-card");
+  backendCard.append(createElement("span", "metric-label", "Backend API"));
+  backendCard.append(renderStatus(backend.status));
+  backendCard.append(createElement("strong", "", backend.url));
+  backendCard.append(createElement("small", "", backend.api));
+
+  const dbCard = createElement("article", "system-card");
+  dbCard.append(createElement("span", "metric-label", "Action DB"));
+  dbCard.append(renderStatus(database.status));
+  dbCard.append(createElement("strong", "", `${database.type} · ${database.records} records`));
+  dbCard.append(createElement("small", "", database.path));
+
+  const terraformCard = createElement("article", "system-card");
+  terraformCard.append(createElement("span", "metric-label", "Terraform Adapter"));
+  terraformCard.append(renderStatus(terraform.status));
+  terraformCard.append(createElement("strong", "", terraform.workingDirectory));
+  terraformCard.append(createElement("small", "", "plan-only controls"));
+
+  section.append(backendCard, dbCard, terraformCard);
   return section;
 }
 
@@ -332,6 +363,7 @@ function render(data, source) {
   app.append(renderHeader(data, source));
   if (data.liveError) app.append(createElement("div", "notice", data.liveError));
   app.append(renderOverview(data));
+  app.append(renderSystemStatus(data));
 
   const layout = createElement("main", "dashboard-layout");
   layout.append(renderTimeline(data));
