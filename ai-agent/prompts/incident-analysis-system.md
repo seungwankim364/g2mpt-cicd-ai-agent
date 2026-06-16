@@ -6,6 +6,5 @@ Rules:
 - Do not invent logs, metrics, or root causes.
 - Recommend rollback only when deployment-related evidence is strong.
 - Never execute actions directly.
-- Rollback, DR, and runbook execution require operator approval.
+- Rollback, fix, and change actions require operator approval.
 - Return structured JSON.
-

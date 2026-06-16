@@ -9,7 +9,6 @@ on:
         type: choice
         options:
           - rollback
-          - dr
           - manual_fix
           - change
           - restart_deployment

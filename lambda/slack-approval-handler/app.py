@@ -55,8 +55,27 @@ def _slack_signing_secret():
     if boto3 is None or not SLACK_SIGNING_SECRET_ARN:
         return ""
     response = boto3.client("secretsmanager").get_secret_value(SecretId=SLACK_SIGNING_SECRET_ARN)
-    _SLACK_SIGNING_SECRET_CACHE = response.get("SecretString", "")
+    _SLACK_SIGNING_SECRET_CACHE = _parse_secret_value(
+        response.get("SecretString", ""),
+        ("signing_secret", "slack_signing_secret", "SLACK_SIGNING_SECRET"),
+    )
     return _SLACK_SIGNING_SECRET_CACHE
+
+
+def _parse_secret_value(secret, candidate_keys):
+    if not secret:
+        return ""
+    try:
+        parsed = json.loads(secret)
+    except json.JSONDecodeError:
+        return secret
+    if isinstance(parsed, dict):
+        for key in candidate_keys:
+            if parsed.get(key):
+                return parsed[key]
+        if len(parsed) == 1:
+            return next(iter(parsed.values()))
+    return secret
 
 
 def _parse_payload(body):

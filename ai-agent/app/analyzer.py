@@ -31,7 +31,7 @@ def _recommended_action(alerts: list[dict], signals: list[dict]) -> tuple[str, s
     if "BackendDBPoolExhaustion" in names:
         return "open_change_pr", "DB pool pressure needs a controlled configuration change."
     if {"RedisConnectionError", "SQSMessageAge", "SQSQueueBacklog", "SQSDLQMessages"} & names:
-        return "dr", "Dependency or data-plane alerts indicate a broader failure than one pod."
+        return "open_fix_issue", "Dependency or data-plane alerts need operator review before a safe change."
     if "WAFBlockedRequestSpike" in names:
         return "open_fix_issue", "WAF behavior needs rule/config review before a safe change."
     if any(severity == "critical" for severity in severities):

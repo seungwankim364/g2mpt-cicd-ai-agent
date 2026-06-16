@@ -153,8 +153,27 @@ def slack_webhook_url():
     if boto3 is None or not SLACK_WEBHOOK_SECRET_ARN:
         return ""
     response = boto3.client("secretsmanager").get_secret_value(SecretId=SLACK_WEBHOOK_SECRET_ARN)
-    _SLACK_WEBHOOK_CACHE = response.get("SecretString", "")
+    _SLACK_WEBHOOK_CACHE = _parse_secret_value(
+        response.get("SecretString", ""),
+        ("url", "webhook_url", "slack_webhook_url", "SLACK_WEBHOOK_URL"),
+    )
     return _SLACK_WEBHOOK_CACHE
+
+
+def _parse_secret_value(secret, candidate_keys):
+    if not secret:
+        return ""
+    try:
+        parsed = json.loads(secret)
+    except json.JSONDecodeError:
+        return secret
+    if isinstance(parsed, dict):
+        for key in candidate_keys:
+            if parsed.get(key):
+                return parsed[key]
+        if len(parsed) == 1:
+            return next(iter(parsed.values()))
+    return secret
 
 
 def send_second_slack_alert(result):

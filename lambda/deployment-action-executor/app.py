@@ -16,7 +16,6 @@ APP_DEPLOY_WORKFLOW_REF = os.environ.get("APP_DEPLOY_WORKFLOW_REF", "main")
 
 WORKFLOW_REPOS = {
     "rollback": os.environ.get("ROLLBACK_WORKFLOW_REPO", ""),
-    "dr": os.environ.get("DR_WORKFLOW_REPO", ""),
     "manual_fix": os.environ.get("MANUAL_FIX_WORKFLOW_REPO", ""),
     "change": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
     "restart_deployment": os.environ.get("CHANGE_WORKFLOW_REPO", ""),
@@ -29,7 +28,6 @@ WORKFLOW_REPOS = {
 
 WORKFLOW_FILES = {
     "rollback": os.environ.get("ROLLBACK_WORKFLOW_FILE", "rollback.yml"),
-    "dr": os.environ.get("DR_WORKFLOW_FILE", "dr-failover.yml"),
     "manual_fix": os.environ.get("MANUAL_FIX_WORKFLOW_FILE", "manual-fix.yml"),
     "change": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),
     "restart_deployment": os.environ.get("CHANGE_WORKFLOW_FILE", "change-apply.yml"),

@@ -24,7 +24,6 @@
           "type": "string",
           "enum": [
             "rollback",
-            "dr",
             "manual_fix",
             "change",
             "restart_deployment",

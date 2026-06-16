@@ -15,10 +15,10 @@ OUTPUT_FILE="${OUTPUT_FILE:-deployment-action-approved-event.json}"
 DRY_RUN="${DRY_RUN:-false}"
 
 case "$ACTION_TYPE" in
-  rollback|dr|manual_fix|change|restart_deployment|scale_replicas|increase_memory|increase_hpa|open_fix_issue|open_change_pr)
+  rollback|manual_fix|change|restart_deployment|scale_replicas|increase_memory|increase_hpa|open_fix_issue|open_change_pr)
     ;;
   *)
-    echo "ACTION_TYPE must be one of: rollback, dr, manual_fix, change, restart_deployment, scale_replicas, increase_memory, increase_hpa, open_fix_issue, open_change_pr" >&2
+    echo "ACTION_TYPE must be one of: rollback, manual_fix, change, restart_deployment, scale_replicas, increase_memory, increase_hpa, open_fix_issue, open_change_pr" >&2
     exit 2
     ;;
 esac

@@ -46,6 +46,12 @@ variable "slack_signing_secret_arn" {
   description = "AWS Secrets Manager ARN for Slack app signing secret. Prefer this over slack_signing_secret."
 }
 
+variable "slack_webhook_secret_arn" {
+  type        = string
+  default     = ""
+  description = "AWS Secrets Manager ARN for Slack incoming webhook URL. When set, Terraform reuses the existing secret instead of creating one."
+}
+
 variable "github_token_secret_arn" {
   type    = string
   default = ""
@@ -69,11 +75,6 @@ variable "bedrock_max_tokens" {
 }
 
 variable "rollback_workflow_repo" {
-  type    = string
-  default = "seungwankim364/g2mpt-cicd-ai-agent"
-}
-
-variable "dr_workflow_repo" {
   type    = string
   default = "seungwankim364/g2mpt-cicd-ai-agent"
 }

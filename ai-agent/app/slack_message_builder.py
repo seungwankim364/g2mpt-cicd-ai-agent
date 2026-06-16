@@ -43,7 +43,7 @@ def build_second_alert(recommendation: dict, links: dict | None = None) -> dict:
                     {
                         "type": "button",
                         "text": {"type": "plain_text", "text": f"Approve {action_type}"},
-                        "style": "danger" if action_type in {"rollback", "dr"} else "primary",
+                        "style": "danger" if action_type == "rollback" else "primary",
                         "action_id": f"approve_{action_type}",
                         "value": json.dumps(value),
                         "confirm": {

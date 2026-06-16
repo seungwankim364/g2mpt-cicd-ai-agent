@@ -46,6 +46,16 @@ enable_dashboard=false -> dashboard resources disabled
 enable_dashboard=true  -> dashboard resources enabled
 ```
 
+Slack webhook secret은 이미 수동 생성된 값을 재사용한다.
+
+```text
+terraform.tfvars:
+  slack_webhook_secret_arn = arn:aws:secretsmanager:ap-northeast-2:337112169365:secret:cd-quality-gate-prod/slack/webhook-url-SjqVIF
+```
+
+이 값이 비어 있으면 Terraform이 `cd-quality-gate-prod/slack/webhook-url` secret을 새로 만들려고 한다.
+이미 같은 이름의 secret이 있으면 apply가 실패하므로, 운영 계정에서는 기존 ARN을 유지한다.
+
 생성 후 확인할 output:
 
 ```text
@@ -94,14 +104,19 @@ gympt-ops 리소스 전체
 | Action type | Repository variable | Workflow file | Local file exists |
 | --- | --- | --- | --- |
 | `rollback` | `rollback_workflow_repo` | `rollback.yml` | yes |
-| `dr` | `dr_workflow_repo` | `dr-failover.yml` | yes |
 | `manual_fix` | `manual_fix_workflow_repo` | `manual-fix.yml` | yes |
 | `change` | `change_workflow_repo` | `change-apply.yml` | yes |
+| `restart_deployment` | `change_workflow_repo` | `change-apply.yml` | yes |
+| `scale_replicas` | `change_workflow_repo` | `change-apply.yml` | yes |
+| `increase_memory` | `change_workflow_repo` | `change-apply.yml` | yes |
+| `increase_hpa` | `change_workflow_repo` | `change-apply.yml` | yes |
+| `open_fix_issue` | `manual_fix_workflow_repo` | `manual-fix.yml` | yes |
+| `open_change_pr` | `change_workflow_repo` | `change-apply.yml` | yes |
 
 현재 기본 repository:
 
 ```text
-rollback/dr/manual_fix/change -> seungwankim364/g2mpt-cicd-ai-agent
+rollback/manual_fix/change -> seungwankim364/g2mpt-cicd-ai-agent
 app redeploy -> hj-3/gympt-app
 ```
 
@@ -110,7 +125,6 @@ dispatch input 이름은 아래 파일 사이에서 일치한다.
 ```text
 lambda/deployment-action-executor/app.py
 .github/workflows/rollback.yml
-.github/workflows/dr-failover.yml
 .github/workflows/manual-fix.yml
 .github/workflows/change-apply.yml
 ```
@@ -138,9 +152,11 @@ rollback은 target_image_tag가 필수다.
 rollback은 이 repo의 `.github/workflows/rollback.yml`이 `hj-3/gympt-gitops/charts/backend-api/values-prod.yaml`의 `image.tag`를 직접 이전 tag로 갱신한다.
 따라서 이 repo의 GitHub Secret `GH_WORKFLOW_DISPATCH_TOKEN`은 `hj-3/gympt-gitops` contents write 권한이 필요하다.
 AWS Secrets Manager의 GitHub dispatch token은 이 repo의 rollback workflow를 workflow_dispatch 할 수 있어야 한다.
-dr/manual_fix/change는 target_image_tag가 비어 있을 수 있으므로 executor가 currentImageTag로 fallback한다.
-dr/manual_fix/change workflow는 현재 요청 기록, artifact, GitHub issue 생성까지 수행한다.
-dr/manual_fix/change의 실제 운영 실행 명령은 아직 자동 연결하지 않는다.
+manual_fix/change는 target_image_tag가 비어 있을 수 있으므로 executor가 currentImageTag로 fallback한다.
+manual_fix/open_fix_issue workflow는 현재 요청 기록, artifact, GitHub issue 생성을 수행한다.
+restart_deployment/scale_replicas/increase_memory/increase_hpa workflow는 `change-apply.yml`에서 GitOps values patch를 수행한다.
+change/open_change_pr workflow는 요청 기록, artifact, GitHub issue 생성까지 수행한다.
+DR은 현재 gympt-ops에 실제 전환 switch/workflow가 없으므로 운영 action에서 제외한다.
 workflow 파일이 실제 GitHub repository에 존재하는지는 apply 후 GitHub API dispatch smoke test로 최종 확인한다.
 ```
 
@@ -182,3 +198,58 @@ Slack App Signing Secret
 ```
 
 `SLACK_SIGNING_SECRET` 직접 주입은 로컬 테스트나 임시 검증에만 사용한다.
+
+SecretString 형식:
+
+```text
+raw string:
+  <slack signing secret>
+
+json:
+  {"signing_secret":"<slack signing secret>"}
+  {"slack_signing_secret":"<slack signing secret>"}
+  {"SLACK_SIGNING_SECRET":"<slack signing secret>"}
+  {"cd-quality-gate/slack/signing-secret":"<slack signing secret>"}
+```
+
+Slack webhook URL secret도 raw URL 또는 JSON key를 지원한다.
+
+```text
+raw string:
+  https://hooks.slack.com/services/...
+
+json:
+  {"url":"https://hooks.slack.com/services/..."}
+  {"webhook_url":"https://hooks.slack.com/services/..."}
+  {"slack_webhook_url":"https://hooks.slack.com/services/..."}
+  {"SLACK_WEBHOOK_URL":"https://hooks.slack.com/services/..."}
+  {"cd-quality-gate-prod/slack/webhook-url":"https://hooks.slack.com/services/..."}
+```
+
+## 4. Slack 운영 최종 사전 검증
+
+apply 전에 로컬에서 통과해야 하는 항목:
+
+```text
+1. scripts/test-local.sh 통과
+2. Lambda zip package 생성 통과
+3. workflow YAML parse 통과
+4. action type -> workflow dispatch contract 통과
+5. terraform fmt -check 통과
+6. terraform validate 통과
+7. terraform plan -out=tfplan 통과
+```
+
+apply 후 운영에서 확인해야 하는 항목:
+
+```text
+1. Terraform output slack_interactivity_url 확인
+2. Slack App Interactivity Request URL에 slack_interactivity_url 등록
+3. Slack #cd-deploy-alarm에 배포 완료 알림 수신 확인
+4. 실패 배포 또는 fixture 기반으로 1차 실패 알림 수신 확인
+5. EventBridge -> analysis-orchestrator -> Bedrock -> Slack 2차 알림 수신 확인
+6. Slack 승인 버튼 클릭
+7. API Gateway -> slack-approval-handler -> EventBridge DeploymentActionApproved 발행 확인
+8. deployment-action-executor가 action별 GitHub workflow_dispatch 실행 확인
+9. rollback/fix/change 결과가 GitOps commit, issue, artifact 중 기대 경로로 남는지 확인
+```

@@ -2291,3 +2291,112 @@ terraform -chdir=infra/terraform validate 통과
 dashboard 활성화 plan: 49 to add, 0 to change, 0 to destroy
 apply는 실행하지 않음
 ```
+
+### 2026-06-16 15:38 - Slack 운영 최종 사전 검증
+
+작업:
+
+```text
+Slack 승인 버튼 -> API Gateway -> slack-approval-handler -> EventBridge -> deployment-action-executor -> GitHub workflow_dispatch 흐름을 최종 점검했다.
+rollback.yml에 app_repo/app_workflow/app_ref compatibility input이 빠져 workflow_dispatch 422가 날 수 있는 문제를 보정했다.
+analysis-orchestrator와 slack-approval-handler가 Secrets Manager SecretString raw string뿐 아니라 JSON object도 파싱하도록 보강했다.
+Slack webhook/signing secret이 secret 이름을 key로 가진 JSON object여도 단일 key 값을 사용할 수 있게 했다.
+기존 수동 생성 Slack webhook secret과 Terraform 신규 생성이 충돌하지 않도록 slack_webhook_secret_arn 변수로 기존 ARN을 재사용하게 했다.
+pre-apply checklist에 실제 action 자동화 수준과 Slack secret 형식을 업데이트했다.
+```
+
+수정 파일:
+
+```text
+.github/workflows/rollback.yml
+lambda/analysis-orchestrator/app.py
+lambda/slack-approval-handler/app.py
+infra/terraform/iam.tf
+infra/terraform/lambda.tf
+infra/terraform/main.tf
+infra/terraform/slack.tf
+infra/terraform/variables.tf
+infra/terraform/terraform.tfvars
+docs/20-implementation/28-pre-apply-verification-checklist.md
+work-log.md
+```
+
+확인 결과:
+
+```text
+AWS caller: arn:aws:iam::337112169365:user/mzc-ksw
+AWS Secrets Manager cd-quality-gate/slack/signing-secret 존재 확인
+AWS Secrets Manager cd-quality-gate-prod/slack/webhook-url 존재 확인
+AWS Secrets Manager cd-quality-gate/github/dispatch-token 존재 확인
+세 secret 모두 JSON object 형식이며 단일 key 값으로 저장되어 있음
+GitHub Actions YAML parse 통과
+action type -> workflow dispatch input contract 통과
+scripts/test-local.sh 통과
+scripts/lambda/package-analysis-orchestrator.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+terraform -chdir=infra/terraform validate 통과
+terraform -chdir=infra/terraform plan -out=tfplan 통과
+plan 결과: 27 to add, 0 to change, 0 to destroy
+apply는 실행하지 않음
+```
+
+남은 운영 확인:
+
+```text
+Terraform apply 후 slack_interactivity_url output을 Slack App Interactivity Request URL에 등록해야 한다.
+GitHub repository variables가 비어 있어 DR 승인은 현재 issue/artifact까지만 수행하고 자동 failover patch는 비활성 상태다.
+EKS/self-hosted runner/Prometheus/backend deployment가 올라온 뒤 Slack 1차/2차/승인 버튼 실제 end-to-end 테스트가 필요하다.
+```
+
+### 2026-06-16 16:00 - DR 운영 action 제거
+
+작업:
+
+```text
+gympt-ops에는 별도 DR 전환 workflow/GitOps switch가 없고, 현재 운영 대응은 rollback/fix/change로 충분하다고 판단했다.
+Slack 승인 action에서 DR을 제거하고 rollback/fix/change만 남겼다.
+AI local analyzer와 Bedrock prompt가 DR을 추천하지 않도록 변경했다.
+deployment-action-executor에서 dr -> dr-failover.yml dispatch mapping을 제거했다.
+dr-failover.yml workflow 파일을 삭제했다.
+EventBridge approved action schema와 AI recommendation schema에서 dr enum을 제거했다.
+Terraform Lambda env에서 DR_WORKFLOW_REPO를 제거하고 dr_workflow_repo variable을 삭제했다.
+README와 pre-apply checklist를 rollback/fix/change 기준으로 수정했다.
+```
+
+수정 파일:
+
+```text
+.github/workflows/approved-action.yml
+.github/workflows/dr-failover.yml
+README.md
+ai-agent/app/analyzer.py
+ai-agent/app/slack_message_builder.py
+ai-agent/prompts/incident-analysis-system.md
+docs/20-implementation/28-pre-apply-verification-checklist.md
+infra/terraform/lambda.tf
+infra/terraform/variables.tf
+lambda/analysis-orchestrator/bedrock_agent.py
+lambda/deployment-action-executor/app.py
+schemas/ai-agent/ai-recommendation.schema.json
+schemas/eventbridge/deployment-action-approved.schema.json
+scripts/quality-gate/publish-approved-action-event.sh
+work-log.md
+```
+
+검증:
+
+```text
+Python compile 통과
+GitHub Actions YAML parse 통과
+schema JSON parse 통과
+action contract 통과
+action list: change, increase_hpa, increase_memory, manual_fix, open_change_pr, open_fix_issue, restart_deployment, rollback, scale_replicas
+ACTION_TYPE=dr approved event 생성 시도는 의도대로 실패
+scripts/test-local.sh 통과
+scripts/lambda/package-analysis-orchestrator.sh 통과
+terraform -chdir=infra/terraform fmt -check 통과
+terraform -chdir=infra/terraform validate 통과
+terraform -chdir=infra/terraform plan -out=tfplan 통과
+plan 결과: 27 to add, 0 to change, 0 to destroy
+apply는 실행하지 않음
+```

@@ -19,7 +19,6 @@ BEDROCK_MAX_TOKENS = int(os.environ.get("BEDROCK_MAX_TOKENS", "1200"))
 
 ALLOWED_ACTIONS = {
     "rollback",
-    "dr",
     "restart_deployment",
     "scale_replicas",
     "increase_memory",
@@ -54,9 +53,9 @@ def _prompt(summary: dict) -> str:
         [
             "Analyze this CD Quality Gate deployment failure.",
             "Use only the provided evidence. Do not invent logs, metrics, or root causes.",
-            "Choose exactly one recommendedAction.type from: rollback, dr, restart_deployment, scale_replicas, increase_memory, increase_hpa, open_fix_issue, open_change_pr, observe.",
+            "Choose exactly one recommendedAction.type from: rollback, restart_deployment, scale_replicas, increase_memory, increase_hpa, open_fix_issue, open_change_pr, observe.",
             "Use rollback only when the evidence points to the new deployment as the likely cause.",
-            "Use dr when infrastructure or dependency failure is broader than one deploy.",
+            "Use open_fix_issue when infrastructure or dependency failure is broader than one deploy and needs operator review.",
             "Use restart_deployment for pod restart or stuck rollout symptoms when the image is not clearly bad.",
             "Use scale_replicas for traffic/latency pressure that can be mitigated by more pods.",
             "Use increase_memory for OOM, heap, memory pressure, or memory-limit symptoms.",
@@ -85,7 +84,7 @@ def _prompt(summary: dict) -> str:
                         }
                     ],
                     "recommendedAction": {
-                        "type": "rollback|dr|restart_deployment|scale_replicas|increase_memory|increase_hpa|open_fix_issue|open_change_pr|observe",
+                        "type": "rollback|restart_deployment|scale_replicas|increase_memory|increase_hpa|open_fix_issue|open_change_pr|observe",
                         "reason": "string",
                         "requiresApproval": True,
                     },

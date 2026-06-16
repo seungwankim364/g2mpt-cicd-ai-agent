@@ -33,6 +33,18 @@ on:
         required: false
         default: charts/backend-api/values-prod.yaml
         description: Helm values file to update
+      app_repo:
+        required: false
+        default: hj-3/gympt-app
+        description: Compatibility input from deployment-action-executor
+      app_workflow:
+        required: false
+        default: backend-api-ci.yml
+        description: Compatibility input from deployment-action-executor
+      app_ref:
+        required: false
+        default: main
+        description: Compatibility input from deployment-action-executor
 
 jobs:
   request-rollback:

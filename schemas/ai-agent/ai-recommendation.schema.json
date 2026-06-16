@@ -19,7 +19,6 @@
           "type": "string",
           "enum": [
             "rollback",
-            "dr",
             "restart_deployment",
             "scale_replicas",
             "increase_memory",

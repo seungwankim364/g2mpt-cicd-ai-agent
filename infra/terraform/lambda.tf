@@ -19,7 +19,7 @@ resource "aws_lambda_function" "analysis_orchestrator" {
       BEDROCK_REGION           = var.aws_region
       BEDROCK_MAX_TOKENS       = tostring(var.bedrock_max_tokens)
       SLACK_CHANNEL            = "#cd-deploy-alarm"
-      SLACK_WEBHOOK_SECRET_ARN = aws_secretsmanager_secret.slack_webhook_url.arn
+      SLACK_WEBHOOK_SECRET_ARN = local.slack_webhook_secret_arn
     }
   }
 
@@ -75,7 +75,6 @@ resource "aws_lambda_function" "deployment_action_executor" {
     variables = {
       GITHUB_TOKEN_SECRET_ARN  = var.github_token_secret_arn
       ROLLBACK_WORKFLOW_REPO   = var.rollback_workflow_repo
-      DR_WORKFLOW_REPO         = var.dr_workflow_repo
       MANUAL_FIX_WORKFLOW_REPO = var.manual_fix_workflow_repo
       CHANGE_WORKFLOW_REPO     = var.change_workflow_repo
       WORKFLOW_REF             = "main"

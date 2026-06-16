@@ -65,9 +65,8 @@ Existing gympt-ops CI/CD
 | Slack 1차 알림 | [scripts/quality-gate/send-slack-first-alert.py](scripts/quality-gate/send-slack-first-alert.py) | 실패 알림 payload 생성 또는 전송 |
 | Slack 배포 완료 알림 | [scripts/quality-gate/send-slack-deploy-success.py](scripts/quality-gate/send-slack-deploy-success.py) | Quality Gate 통과 후 배포 완료 payload 생성 또는 전송 |
 | EventBridge 발행 | [scripts/quality-gate/publish-eventbridge-event.sh](scripts/quality-gate/publish-eventbridge-event.sh) | `DeploymentFailed` 이벤트 payload 생성/발행 |
-| Slack 승인 자동 실행 | [lambda/slack-approval-handler](lambda/slack-approval-handler), [lambda/deployment-action-executor](lambda/deployment-action-executor) | Slack 승인 버튼 수신 후 rollback/DR/manual fix/change workflow 자동 dispatch |
+| Slack 승인 자동 실행 | [lambda/slack-approval-handler](lambda/slack-approval-handler), [lambda/deployment-action-executor](lambda/deployment-action-executor) | Slack 승인 버튼 수신 후 rollback/fix/change workflow 자동 dispatch |
 | Rollback 요청 workflow | [.github/workflows/rollback.yml](.github/workflows/rollback.yml) | 승인 후 `gympt-gitops` values image tag를 직접 이전 tag로 갱신 |
-| DR 요청 workflow | [.github/workflows/dr-failover.yml](.github/workflows/dr-failover.yml) | 승인 후 기존 권한 보유 repo의 DR failover workflow를 자동 호출 |
 | Manual fix workflow | [.github/workflows/manual-fix.yml](.github/workflows/manual-fix.yml) | 승인 후 수동 조치 이슈와 실행 기록 생성 |
 | Change apply workflow | [.github/workflows/change-apply.yml](.github/workflows/change-apply.yml) | 승인 후 change 실행 기록과 이슈 생성 |
 | Lambda 패키징 | [scripts/lambda/package-analysis-orchestrator.sh](scripts/lambda/package-analysis-orchestrator.sh) | Terraform apply 전 Bedrock adapter, `ai-agent` fallback, runbook, Athena query를 포함한 zip 생성 |
@@ -96,7 +95,7 @@ Existing gympt-ops CI/CD
 | Slack Channel | 신규 채널 사용: `#cd-deploy-alarm` |
 | Infra 관리 | Terraform 기준 |
 | 비용 태그 | `Project=cd-quality-gate`, `Environment=dev/prod`, `CostControl=auto-stop` |
-| 알림 종류 | 배포 완료, CD 실패 1차 알림, AI 분석/rollback/DR/change 승인 알림 |
+| 알림 종류 | 배포 완료, CD 실패 1차 알림, AI 분석/rollback/fix/change 승인 알림 |
 | AI 분석 엔진 | 운영 기본값은 Amazon Bedrock, local fallback은 `ai-agent` rule analyzer |
 
 Quality Gate는 backend-api alert만 보지 않는다. `gympt-ops/gympt-gitops/platform/monitoring`의 PrometheusRule과 dashboard를 기준으로 backend, Kubernetes, SQS, GPU, Redis, Bedrock 관련 alert를 5분 window에서 함께 평가한다.
@@ -114,7 +113,7 @@ sqs-metrics
 
 Slack 2차 알림의 승인 버튼을 누르면 API Gateway가 `slack-approval-handler`를 호출하고, `DeploymentActionApproved` 이벤트를 거쳐 `deployment-action-executor`가 action type별 GitHub workflow를 자동 실행한다. 실제 rollback은 `cd-quality-gate` workflow가 GitOps image tag를 직접 되돌리고, change runbook은 GitOps values를 자동 patch한다.
 
-자동 rollback은 `cd-quality-gate`의 `rollback.yml`이 `hj-3/gympt-gitops`의 `charts/backend-api/values-prod.yaml` image tag를 직접 이전 tag로 갱신하는 방식으로 맞춘다. 이 방식은 사용자가 `gympt-gitops` collaborator 권한을 갖고, `cd-quality-gate`에 저장한 PAT가 `gympt-gitops` contents write 권한을 갖는다는 전제다. `restart_deployment`, `scale_replicas`, `increase_memory`, `increase_hpa`는 `change-apply.yml`이 GitOps values를 수정한다. DR은 `DR_VALUES_FILE`, `DR_YAML_PATH`, `DR_TARGET_VALUE` repository variable이 설정된 경우에만 GitOps failover patch를 실행한다.
+자동 rollback은 `cd-quality-gate`의 `rollback.yml`이 `hj-3/gympt-gitops`의 `charts/backend-api/values-prod.yaml` image tag를 직접 이전 tag로 갱신하는 방식으로 맞춘다. 이 방식은 사용자가 `gympt-gitops` collaborator 권한을 갖고, `cd-quality-gate`에 저장한 PAT가 `gympt-gitops` contents write 권한을 갖는다는 전제다. `restart_deployment`, `scale_replicas`, `increase_memory`, `increase_hpa`는 `change-apply.yml`이 GitOps values를 수정한다. DR은 현재 gympt-ops에 실제 전환 switch가 없으므로 운영 action에서 제외한다.
 
 rollback 이후에는 Argo CD가 GitOps tag 변경을 감지해 EKS를 되돌리고, 기존 app 배포 workflow는 배포 완료 후 `cd-quality-gate-architecture`의 `quality-gate.yml`을 호출해야 한다. Quality Gate가 통과하면 Slack `#cd-deploy-alarm`으로 배포 완료 알림을 보낸다.
 
