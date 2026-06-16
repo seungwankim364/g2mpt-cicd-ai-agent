@@ -21,6 +21,38 @@ gympt-ops를 참고한 경우 반드시 "read-only"라고 명시한다.
 
 ## 2026-06-16
 
+### 2026-06-16 12:45 - gympt-apps부터 cd-quality-gate까지 상세 흐름 문서 추가
+
+작업:
+
+```text
+gympt-apps -> gympt-gitops -> cd-quality-gate-architecture 전체 흐름을 한 문서에서 이해할 수 있도록 DOC-36을 추가했다.
+정상 배포, Quality Gate 성공, Quality Gate 실패, EventBridge, Lambda AI 분석, Slack 승인, rollback 직접 GitOps push 흐름을 단계별로 정리했다.
+각 단계에서 실행되는 repo, workflow, script, Lambda, Terraform 파일을 연결했다.
+```
+
+추가 파일:
+
+```text
+docs/20-implementation/31-gympt-app-to-gitops-to-quality-gate-flow.md
+```
+
+수정 파일:
+
+```text
+README.md
+docs/README.md
+docs/20-implementation/README.md
+work-log.md
+```
+
+검증:
+
+```text
+DOC-31 Runtime File Role and Architecture Flow와 중복되지 않게, DOC-36은 repo 간 end-to-end 흐름 중심으로 작성했다.
+현재 확정된 rollback 방식인 cd-quality-gate 직접 gympt-gitops values tag 수정 기준으로 작성했다.
+```
+
 ### 2026-06-16 12:35 - 새 GitHub PAT 권한 확인
 
 작업:
