@@ -127,10 +127,10 @@ scripts/lambda/package-analysis-orchestrator.sh
 [x] DeploymentActionApproved EventBridge event schema
 [x] Deployment action executor Lambda scaffold
 [x] rollback GitOps workflow dispatch scaffold
-[x] DR workflow dispatch scaffold
 [x] manual fix workflow dispatch scaffold
 [x] change workflow dispatch scaffold
 [x] GitHub dispatch token secret ARN 연결 변수
+[x] failover 흐름은 현재 범위에서 제외
 ```
 
 핵심 파일:
@@ -139,7 +139,6 @@ scripts/lambda/package-analysis-orchestrator.sh
 lambda/slack-approval-handler/app.py
 lambda/deployment-action-executor/app.py
 .github/workflows/rollback.yml
-.github/workflows/dr-failover.yml
 .github/workflows/manual-fix.yml
 .github/workflows/change-apply.yml
 .github/workflows/approved-action.yml
@@ -159,20 +158,25 @@ schemas/eventbridge/deployment-action-approved.schema.json
 [x] Terraform output 정리
 [x] Terraform destroy script 추가
 [x] Secrets Manager secret은 destroy 대상에서 제외하는 방식 정리
+[x] GitHub webhook API Gateway/Lambda Terraform scaffold
+[x] Dashboard AWS hosting/API Terraform scaffold
 ```
 
 확인된 상태:
 
 ```text
 [x] terraform -chdir=infra/terraform validate 통과
-[x] terraform state list 기준 현재 state는 비어 있음
+[x] terraform -chdir=infra/terraform plan 통과
+[x] terraform -chdir=infra/terraform plan -var='enable_dashboard=true' 통과
+[x] 기본 plan: 35 to add, 0 to change, 0 to destroy
+[x] dashboard 포함 plan: 56 to add, 0 to change, 0 to destroy
 ```
 
 주의:
 
 ```text
 현재 AWS 리소스가 살아있다는 뜻이 아니다.
-state가 비어 있으므로 현재는 apply 전 또는 destroy 완료 상태다.
+현재는 apply 전 상태다.
 ```
 
 ### 2.6 Dashboard
@@ -185,10 +189,16 @@ state가 비어 있으므로 현재는 apply 전 또는 destroy 완료 상태다
 [x] POST /api/actions 추가
 [x] POST /api/infra/apply-plan 추가
 [x] POST /api/infra/destroy-plan 추가
-[x] rollback/dr/manual_fix/change 기록 버튼 연결
+[x] rollback/manual_fix/change 기록 버튼 연결
 [x] apply/destroy plan 버튼 연결
 [x] dashboard data contract 추가
 [x] demo fallback 추가
+[x] AWS Dashboard API Lambda 추가
+[x] Dashboard DynamoDB action history Terraform 추가
+[x] GitHub Actions API live 조회 구현
+[x] Argo CD API live 조회 구현
+[x] Prometheus /api/v1/alerts live 조회 구현
+[x] live integration 실패 시 unavailable 표시
 ```
 
 핵심 파일:
@@ -201,9 +211,33 @@ dashboard/src/styles.css
 dashboard/src/data/loadDashboardData.js
 dashboard/src/data/sample-dashboard.js
 dashboard/data-contracts/dashboard-data.schema.json
+lambda/dashboard-api/app.py
+infra/terraform/dashboard.tf
 ```
 
-현재 dashboard 버튼은 실제 AWS/GitHub 작업을 실행하지 않는다. 로컬에서는 안전하게 action record와 plan만 남긴다.
+현재 로컬 dashboard 버튼은 실제 AWS/GitHub 작업을 실행하지 않는다. 로컬에서는 안전하게 action record와 plan만 남긴다.
+
+AWS dashboard stack을 apply하면 Dashboard API Lambda가 아래 live status를 조회한다.
+
+```text
+GitHub Actions:
+  hj-3/gympt-app backend-api-ci.yml 최근 workflow run
+
+Argo CD:
+  backend-api-prod sync/health status
+
+Prometheus:
+  /api/v1/alerts firing alert
+```
+
+주의:
+
+```text
+GitHub private repo 조회에는 github_token_secret_arn이 필요하다.
+Argo CD 조회에는 dashboard_argocd_token_secret_arn 또는 접근 가능한 인증 방식이 필요하다.
+Prometheus 기본 URL은 Kubernetes 내부 service 주소이므로 Lambda에서 접근 가능한 네트워크 경로가 필요하다.
+토큰 또는 네트워크가 없으면 dashboard는 해당 integration을 unavailable로 표시한다.
+```
 
 ### 2.7 로컬 테스트
 
@@ -229,6 +263,7 @@ dashboard/data-contracts/dashboard-data.schema.json
 [x] AWS Secrets Manager: Slack webhook URL secret
 [x] AWS Secrets Manager: GitHub dispatch token secret
 [x] AWS Secrets Manager: Slack signing secret
+[x] AWS Secrets Manager: GitHub webhook secret
 ```
 
 Terraform 변수에 들어간 ARN:
@@ -239,6 +274,9 @@ github_token_secret_arn:
 
 slack_signing_secret_arn:
   arn:aws:secretsmanager:ap-northeast-2:337112169365:secret:cd-quality-gate/slack/signing-secret-sYcbdA
+
+github_webhook_secret_arn:
+  arn:aws:secretsmanager:ap-northeast-2:337112169365:secret:cd-quality-gate/github/webhook-secret-X1WKOp
 ```
 
 ## 4. 아직 못 끝낸 것
@@ -252,10 +290,12 @@ slack_signing_secret_arn:
 [ ] terraform plan 확인
 [ ] terraform apply 실행
 [ ] EventBridge bus 생성 확인
-[ ] Lambda 3개 생성 확인
+[ ] Lambda 5개 생성 확인
 [ ] API Gateway 생성 확인
+[ ] GitHub webhook API Gateway 생성 확인
 [ ] S3 result bucket 생성 확인
 [ ] Athena database/workgroup 생성 확인
+[ ] dashboard enable 시 S3/CloudFront/API Gateway/DynamoDB 생성 확인
 [ ] terraform output 확인
 ```
 
@@ -268,6 +308,9 @@ result_bucket_name
 athena_database_name
 athena_workgroup_name
 slack_interactivity_url
+github_webhook_url
+dashboard_api_url
+dashboard_cloudfront_url
 ```
 
 ### 4.2 Slack App 실제 연결
@@ -293,7 +336,10 @@ slack_interactivity_url
 [ ] Grafana 접근 확인
 [ ] backend-api-prod deployment 복구
 [ ] Argo CD backend-api-prod sync 상태 확인
-[ ] GitHub Actions quality-gate workflow_dispatch 실행
+[ ] GitHub webhook URL을 hj-3/gympt-app Webhook에 등록
+[ ] GitHub Webhook event: Workflow runs 선택
+[ ] backend-api-ci.yml 완료 후 webhook delivery 2xx 확인
+[ ] cd-quality-gate quality-gate.yml 자동 workflow_dispatch 확인
 [ ] 5분 Health Check Window 실제 실행
 [ ] Slack #cd-deploy-alarm 배포 완료 알림 확인
 [ ] 실패 fixture가 아니라 실제 Prometheus alert 기준 실패 알림 확인
@@ -326,7 +372,6 @@ slack_interactivity_url
 [x] cd-quality-gate AWS dispatch token이 cd-quality-gate rollback.yml workflow_dispatch 권한을 갖는지 확인
 [x] cd-quality-gate GitHub Secret GH_WORKFLOW_DISPATCH_TOKEN 존재 확인
 [x] 새 PAT가 hj-3/gympt-gitops push 권한을 갖는지 확인
-[ ] DR target repository에 dr-failover workflow 존재 확인
 [ ] gympt-app repository에 app deploy workflow 존재 확인
 [ ] dispatch token에 workflow dispatch 권한 확인
 [ ] repository owner/name/ref 값 확인
@@ -335,29 +380,31 @@ slack_interactivity_url
 ### 4.6 Dashboard live 연결
 
 ```text
-[ ] dashboard-data.json 생성 script 추가
-[ ] S3 result summary에서 dashboard data 생성
-[ ] GitHub Actions API로 workflow status 조회
-[ ] Prometheus API로 live alert/metric 조회
-[ ] Terraform output 값을 dashboard에 반영
+[x] GitHub Actions API로 workflow status 조회 구현
+[x] Argo CD API로 sync/health status 조회 구현
+[x] Prometheus API로 live alert 조회 구현
+[x] Dashboard API Lambda 응답 구조 로컬 확인
+[ ] AWS apply 후 dashboard_cloudfront_url 접근 확인
+[ ] GitHub Actions live status 실제 표시 확인
+[ ] Argo CD live sync/health 실제 표시 확인
+[ ] Prometheus live firing alert 실제 표시 확인
+[ ] Terraform output 값을 발표/운영 문서에 반영
 [ ] Slack approval action history와 dashboard action history 대조
-[ ] demo fallback 없이 live mode 검증
+[ ] demo fallback 없이 AWS live mode 검증
 ```
 
 ### 4.7 실제 조치 자동화 수준 확인
 
 현재 rollback은 승인 후 실제 GitOps image tag 변경까지 자동화되어 있다.
-DR/change/manual_fix는 승인 후 요청 기록, artifact, GitHub issue 생성까지 수행한다.
+change/manual_fix는 승인 후 요청 기록, artifact, GitHub issue 생성까지 수행한다.
 실제 실행 명령은 아직 연결하지 않는 것이 현재 기준이다.
 
 남은 확인:
 
 ```text
 [ ] rollback workflow가 실제 GitOps image tag를 이전 tag로 되돌리는지 확인
-[ ] DR 요청 workflow가 issue/artifact를 생성하는지 확인
 [ ] manual_fix workflow가 issue/artifact를 생성하는지 확인
 [ ] change workflow가 issue/artifact를 생성하는지 확인
-[ ] DR 실제 전환 runbook/workflow를 별도 설계할지 결정
 [ ] manual_fix/change를 app PR, GitOps PR, Terraform PR 중 어느 경로로 실행할지 결정
 ```
 
@@ -373,11 +420,14 @@ DR/change/manual_fix는 승인 후 요청 기록, artifact, GitHub issue 생성�
 [x] dispatch 대상 repository/workflow 이름 정리
 [x] dashboard 화면 구성 추가
 [x] rollback workflow를 cd-quality-gate 직접 GitOps push 방식으로 변경
+[x] GitHub webhook handler Lambda 추가
+[x] Dashboard live GitHub/Argo CD/Prometheus 조회 구현
 [x] Lambda zip 재생성
 [x] terraform fmt -check 통과
 [x] terraform validate 통과
 [x] AWS login 재인증
-[x] terraform plan -out=tfplan 실행
+[x] terraform plan 실행
+[x] terraform plan -var='enable_dashboard=true' 실행
 [x] GitHub dispatch token 권한 교체
 [ ] Slack App Interactivity 메뉴 위치 확인
 [ ] draw.io 아키텍처 박스와 DOC-31 흐름 일치 여부 최종 검토
@@ -404,13 +454,17 @@ DR/change/manual_fix는 승인 후 요청 기록, artifact, GitHub issue 생성�
    command: aws login
 
 6. [x] Terraform plan 확인
-   command: AWS_PROFILE=ksw2 terraform -chdir=infra/terraform plan -out=tfplan
-   result: 28 to add, 0 to change, 0 to destroy
+   command: terraform -chdir=infra/terraform plan
+   result: 35 to add, 0 to change, 0 to destroy
 
-7. [x] plan 결과에서 생성 대상 확인
-   check: Lambda, EventBridge, API Gateway, S3, Athena, IAM
+7. [x] Dashboard 포함 Terraform plan 확인
+   command: terraform -chdir=infra/terraform plan -var='enable_dashboard=true'
+   result: 56 to add, 0 to change, 0 to destroy
 
-8. [x] GitHub token 권한 수정
+8. [x] plan 결과에서 생성 대상 확인
+   check: Lambda, EventBridge, API Gateway, S3, Athena, IAM, Dashboard S3/CloudFront/DynamoDB
+
+9. [x] GitHub token 권한 수정
    AWS secret token: repo scope 확인, cd-quality-gate rollback.yml workflow_dispatch 권한 확인
    GitHub secret GH_WORKFLOW_DISPATCH_TOKEN: secret name 존재 확인
    PAT permission: hj-3/gympt-gitops push true 확인
@@ -420,7 +474,8 @@ DR/change/manual_fix는 승인 후 요청 기록, artifact, GitHub issue 생성�
 
 ```text
 terraform apply는 서비스 테스트 전 사전 작업 범위에서 제외한다.
-현재 plan은 완료되었고 `tfplan` 파일이 생성되었다.
+현재 확인은 saved tfplan이 아니라 일반 plan 출력 기준이다.
+apply 직전에는 일반 plan을 다시 확인하거나 `terraform plan -out=tfplan`을 새로 생성해야 한다.
 ```
 
 ### 5.3 AWS를 다시 올릴 때 해야 할 일
@@ -429,10 +484,15 @@ terraform apply는 서비스 테스트 전 사전 작업 범위에서 제외한�
 [ ] scripts/lambda/package-analysis-orchestrator.sh 실행
 [ ] terraform -chdir=infra/terraform init 실행
 [ ] terraform -chdir=infra/terraform validate 실행
-[ ] terraform -chdir=infra/terraform plan -out=tfplan 실행
-[ ] terraform -chdir=infra/terraform apply tfplan 실행
+[ ] terraform -chdir=infra/terraform plan 실행
+[ ] dashboard까지 테스트할 경우 terraform -chdir=infra/terraform plan -var='enable_dashboard=true' 실행
+[ ] saved plan을 쓸 경우 terraform -chdir=infra/terraform plan -out=tfplan 실행
+[ ] terraform -chdir=infra/terraform apply 또는 terraform -chdir=infra/terraform apply tfplan 실행
 [ ] terraform output 저장
+[ ] github_webhook_url 확인
 [ ] Slack App Request URL 연결
+[ ] hj-3/gympt-app Webhook Payload URL에 github_webhook_url 등록
+[ ] GitHub Webhook Secret에 AWS Secrets Manager cd-quality-gate/github/webhook-secret 값 입력
 [ ] Lambda log group 확인
 [ ] EventBridge rule target 확인
 ```
@@ -445,16 +505,44 @@ terraform apply는 서비스 테스트 전 사전 작업 범위에서 제외한�
 [ ] Prometheus URL 접근 확인
 [ ] Grafana dashboard 접근 확인
 [ ] backend-api-prod rollout 확인
-[ ] quality-gate workflow_dispatch 실행
+[ ] Argo CD backend-api-prod Synced/Healthy 확인
+[ ] GitHub Actions backend-api-ci.yml 실행
+[ ] GitHub Webhook delivery 2xx 확인
+[ ] quality-gate.yml 자동 workflow_dispatch 확인
 [ ] 성공 case Slack 알림 확인
 [ ] 실패 case Slack 1차 알림 확인
 [ ] AI 분석 Slack 2차 알림 확인
 [ ] Slack 승인 버튼 확인
-[ ] 자동 rollback 또는 DR dispatch 확인
+[ ] 자동 rollback 또는 fix/change dispatch 확인
 [ ] 재배포 후 최종 완료 알림 확인
+[ ] Dashboard live GitHub Actions status 확인
+[ ] Dashboard live Argo CD sync/health 확인
+[ ] Dashboard live Prometheus firing alert 확인
 ```
 
-### 5.5 퇴근 전 해야 할 일
+### 5.5 k6 / Prometheus / Grafana 발표용 검증
+
+서비스가 올라온 뒤 발표 영상 또는 캡처를 만들려면 아래 순서가 좋다.
+
+```text
+[ ] 정상 부하 k6 테스트 실행
+[ ] Grafana API latency dashboard에서 P50/P95/P99 확인
+[ ] 고부하 k6 테스트 실행
+[ ] latency 상승 또는 error rate 변화 확인
+[ ] Prometheus /alerts 화면 확인
+[ ] 필요 시 실패 유도 endpoint로 안전한 error rate 테스트
+[ ] Slack #cd-deploy-alarm 알림 화면 캡처
+[ ] Dashboard Live CI/CD & Monitoring 화면 캡처
+```
+
+주의:
+
+```text
+Redis memory pressure, SQS backlog, 운영 장애 유도는 prod에서 직접 만들지 않는다.
+가능하면 dev/staging 또는 안전한 테스트 endpoint로만 시연한다.
+```
+
+### 5.6 퇴근 전 해야 할 일
 
 ```text
 [ ] cd-quality-gate Terraform state에 생성된 리소스만 확인
@@ -471,13 +559,15 @@ terraform apply는 서비스 테스트 전 사전 작업 범위에서 제외한�
 
 ```text
 1. AWS stack apply
-2. Slack Interactivity Request URL 연결
-3. Slack 버튼 -> API Gateway -> Lambda -> EventBridge smoke test
-4. 서비스 복구
-5. Quality Gate 실제 5분 Health Check
-6. 실패 시나리오 end-to-end
-7. dashboard live data 연결
-8. 퇴근 전 Terraform destroy 검증
+2. terraform output에서 github_webhook_url, slack_interactivity_url 확인
+3. GitHub Webhook과 Slack Interactivity Request URL 연결
+4. Slack 버튼 -> API Gateway -> Lambda -> EventBridge smoke test
+5. 서비스 복구
+6. GitHub Actions -> GitOps -> Argo CD -> Quality Gate 자동 연결 검증
+7. Quality Gate 실제 5분 Health Check
+8. Dashboard live GitHub/Argo CD/Prometheus 조회 검증
+9. 실패 시나리오 end-to-end
+10. 퇴근 전 Terraform destroy 검증
 ```
 
 ## 7. 완료 판단 기준
@@ -486,10 +576,12 @@ terraform apply는 서비스 테스트 전 사전 작업 범위에서 제외한�
 
 ```text
 [ ] terraform apply로 cd-quality-gate AWS 리소스 생성
+[ ] hj-3/gympt-app GitHub Webhook이 github_webhook_url로 delivery 성공
 [ ] Slack 버튼이 실제 Lambda까지 도달
 [ ] DeploymentFailed event가 analysis-orchestrator를 실행
 [ ] Bedrock 분석 결과가 Slack 2차 알림으로 도착
-[ ] rollback/DR/change/manual_fix 승인 시 GitHub workflow가 자동 dispatch
+[ ] rollback/change/manual_fix 승인 시 GitHub workflow가 자동 dispatch
+[ ] Dashboard에서 GitHub Actions, Argo CD, Prometheus live status 표시
 [ ] app redeploy 후 Quality Gate가 다시 실행
 [ ] 성공 시 Slack 배포 완료 알림 도착
 [ ] terraform destroy로 이 프로젝트 리소스만 삭제
