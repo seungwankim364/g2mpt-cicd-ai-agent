@@ -57,6 +57,24 @@ variable "github_token_secret_arn" {
   default = ""
 }
 
+variable "dashboard_argocd_token_secret_arn" {
+  type        = string
+  default     = ""
+  description = "Optional AWS Secrets Manager ARN for an Argo CD API token used by the dashboard live status integration."
+}
+
+variable "dashboard_argocd_url" {
+  type        = string
+  default     = "https://argocd.g2mpt.com"
+  description = "Argo CD base URL used by the dashboard live status integration."
+}
+
+variable "dashboard_prometheus_url" {
+  type        = string
+  default     = "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
+  description = "Prometheus base URL used by the dashboard live alert integration."
+}
+
 variable "github_webhook_secret_arn" {
   type        = string
   default     = ""

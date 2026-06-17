@@ -233,6 +233,19 @@ resource "aws_iam_role_policy" "dashboard_api" {
           aws_s3_bucket.analysis_results.arn,
           "${aws_s3_bucket.analysis_results.arn}/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = length(compact([
+          var.github_token_secret_arn,
+          var.dashboard_argocd_token_secret_arn
+          ])) > 0 ? compact([
+          var.github_token_secret_arn,
+          var.dashboard_argocd_token_secret_arn
+        ]) : ["*"]
       }
     ]
   })
@@ -251,9 +264,17 @@ resource "aws_lambda_function" "dashboard_api" {
 
   environment {
     variables = {
-      EVENT_BUS_NAME    = aws_cloudwatch_event_bus.cd_quality_gate.name
-      ACTION_TABLE_NAME = aws_dynamodb_table.dashboard_actions[0].name
-      RESULT_BUCKET     = aws_s3_bucket.analysis_results.bucket
+      EVENT_BUS_NAME          = aws_cloudwatch_event_bus.cd_quality_gate.name
+      ACTION_TABLE_NAME       = aws_dynamodb_table.dashboard_actions[0].name
+      RESULT_BUCKET           = aws_s3_bucket.analysis_results.bucket
+      GITHUB_TOKEN_SECRET_ARN = var.github_token_secret_arn
+      GITHUB_REPOSITORY       = var.app_deploy_workflow_repo
+      GITHUB_WORKFLOW_FILE    = var.app_deploy_workflow_file
+      GITHUB_BRANCH           = var.app_deploy_workflow_ref
+      ARGOCD_URL              = var.dashboard_argocd_url
+      ARGOCD_APP              = "backend-api-prod"
+      ARGOCD_TOKEN_SECRET_ARN = var.dashboard_argocd_token_secret_arn
+      PROMETHEUS_URL          = var.dashboard_prometheus_url
     }
   }
 

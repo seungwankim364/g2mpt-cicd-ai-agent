@@ -94,6 +94,48 @@ export const sampleDashboard = {
     githubRun: "https://github.com/hj-3/gympt-app/actions",
     slackChannel: "#cd-deploy-alarm"
   },
+  live: {
+    github: {
+      status: "complete",
+      source: "github",
+      repository: "hj-3/gympt-app",
+      workflow: "backend-api-ci.yml",
+      branch: "main",
+      latest: {
+        runNumber: 115,
+        status: "completed",
+        conclusion: "success",
+        headSha: "abc1234",
+        updatedAt: "2026-06-12T15:21:00+09:00",
+        url: "https://github.com/hj-3/gympt-app/actions"
+      },
+      runs: [
+        { runNumber: 115, status: "completed", conclusion: "success", headSha: "abc1234", updatedAt: "2026-06-12T15:21:00+09:00", url: "https://github.com/hj-3/gympt-app/actions" },
+        { runNumber: 114, status: "completed", conclusion: "success", headSha: "def5678", updatedAt: "2026-06-12T14:52:00+09:00", url: "https://github.com/hj-3/gympt-app/actions" }
+      ]
+    },
+    argocd: {
+      status: "complete",
+      source: "argocd",
+      app: "backend-api-prod",
+      syncStatus: "Synced",
+      healthStatus: "Healthy",
+      revision: "abc1234",
+      operationPhase: "Succeeded",
+      url: "https://argocd.g2mpt.com/applications/backend-api-prod"
+    },
+    prometheus: {
+      status: "failed",
+      source: "prometheus",
+      url: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090",
+      totalAlerts: 7,
+      firingAlerts: 6,
+      alerts: [
+        { name: "BackendHighErrorRate", severity: "critical", namespace: "gympt-prod", summary: "Backend API error rate is above threshold" },
+        { name: "BackendHighLatency", severity: "warning", namespace: "gympt-prod", summary: "Backend API p95 latency is high" }
+      ]
+    }
+  },
   analysis: {
     engine: "Amazon Bedrock",
     model: "anthropic.claude-3-haiku-20240307-v1:0",

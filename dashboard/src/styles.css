@@ -159,7 +159,8 @@ button {
 
 .status.pending,
 .status.available,
-.status.connected {
+.status.connected,
+.status.linked {
   color: var(--blue);
   background: #eff5ff;
   border-color: #c6d9ff;
@@ -268,6 +269,35 @@ button {
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.live-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.live-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 220px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.live-card h3,
+.live-card p {
+  margin: 0;
+}
+
+.live-card p,
+.live-card small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .section-header {
@@ -708,6 +738,7 @@ button {
 @media (max-width: 1120px) {
   .overview-grid,
   .system-grid,
+  .live-grid,
   .alert-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -733,6 +764,7 @@ button {
 
   .overview-grid,
   .system-grid,
+  .live-grid,
   .alert-grid,
   .infra-meta {
     grid-template-columns: 1fr;

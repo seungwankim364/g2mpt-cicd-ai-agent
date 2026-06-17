@@ -14,7 +14,8 @@ const STATUS_LABELS = {
   blocked: "Blocked",
   critical: "Critical",
   connected: "Connected",
-  unavailable: "Unavailable"
+  unavailable: "Unavailable",
+  linked: "Linked"
 };
 
 const statusClass = (status = "") => `status ${status.toLowerCase().replaceAll("_", "-")}`;
@@ -141,29 +142,75 @@ function renderOverview(data) {
 function renderSystemStatus(data) {
   const section = createElement("section", "system-grid");
   const system = data.system || {};
-  const backend = system.backend || { status: "unavailable", url: "-", api: "-" };
-  const database = system.database || { status: "unavailable", type: "-", records: 0, path: "-" };
-  const terraform = system.terraform || { status: "unavailable", workingDirectory: "-" };
+  const cards = [
+    ["GitHub Actions", system.githubActions?.status, data.live?.github?.workflow || "backend-api-ci.yml", data.live?.github?.latest?.conclusion || data.live?.github?.latest?.status || system.githubActions?.url],
+    ["Argo CD", system.argocd?.status, data.live?.argocd?.app || data.deployment.argocdApp, `${data.live?.argocd?.syncStatus || "-"} / ${data.live?.argocd?.healthStatus || "-"}`],
+    ["Prometheus", system.prometheus?.status, `${data.live?.prometheus?.firingAlerts ?? 0} firing alerts`, system.prometheus?.url],
+    ["Dashboard API", system.backend?.status, "dashboard-api-lambda", system.backend?.api],
+    ["Action DB", system.database?.status, `${system.database?.type || "-"} · ${system.database?.records || 0} records`, system.database?.path],
+    ["EventBridge", system.eventBridge?.status, system.eventBridge?.bus || "-", "approval/action event bus"]
+  ];
 
-  const backendCard = createElement("article", "system-card");
-  backendCard.append(createElement("span", "metric-label", "Backend API"));
-  backendCard.append(renderStatus(backend.status));
-  backendCard.append(createElement("strong", "", backend.url));
-  backendCard.append(createElement("small", "", backend.api));
+  cards.forEach(([label, status = "unavailable", value = "-", detail = "-"]) => {
+    const card = createElement("article", "system-card");
+    card.append(createElement("span", "metric-label", label));
+    card.append(renderStatus(status));
+    card.append(createElement("strong", "", value || "-"));
+    card.append(createElement("small", "", detail || "-"));
+    section.append(card);
+  });
+  return section;
+}
 
-  const dbCard = createElement("article", "system-card");
-  dbCard.append(createElement("span", "metric-label", "Action DB"));
-  dbCard.append(renderStatus(database.status));
-  dbCard.append(createElement("strong", "", `${database.type} · ${database.records} records`));
-  dbCard.append(createElement("small", "", database.path));
+function renderLiveIntegrations(data) {
+  const section = createElement("section", "panel wide");
+  section.append(sectionHeader("Live CI/CD & Monitoring", "GitHub Actions, Argo CD, and Prometheus API status"));
 
-  const terraformCard = createElement("article", "system-card");
-  terraformCard.append(createElement("span", "metric-label", "Terraform Adapter"));
-  terraformCard.append(renderStatus(terraform.status));
-  terraformCard.append(createElement("strong", "", terraform.workingDirectory));
-  terraformCard.append(createElement("small", "", "plan-only controls"));
+  const grid = createElement("div", "live-grid");
+  const github = data.live?.github || {};
+  const argocd = data.live?.argocd || {};
+  const prometheus = data.live?.prometheus || {};
 
-  section.append(backendCard, dbCard, terraformCard);
+  const githubCard = createElement("article", "live-card");
+  githubCard.append(createElement("h3", "", "GitHub Actions"));
+  githubCard.append(renderStatus(github.status || "unavailable"));
+  githubCard.append(createElement("p", "", `${github.repository || "-"} / ${github.workflow || "-"}`));
+  const runs = createElement("ul", "compact-list");
+  (github.runs || []).forEach((run) => {
+    const item = createElement("li", "");
+    item.append(createElement("strong", "", `#${run.runNumber || "-"}`));
+    item.append(createElement("span", "", `${run.status || "-"} / ${run.conclusion || "-"}`));
+    item.append(createElement("em", "", run.headSha || "-"));
+    runs.append(item);
+  });
+  if (github.reason) runs.append(createElement("li", "", github.reason));
+  githubCard.append(runs);
+
+  const argoCard = createElement("article", "live-card");
+  argoCard.append(createElement("h3", "", "Argo CD"));
+  argoCard.append(renderStatus(argocd.status || "unavailable"));
+  argoCard.append(createElement("p", "", `${argocd.app || data.deployment.argocdApp} · revision ${argocd.revision ? argocd.revision.slice(0, 7) : "-"}`));
+  argoCard.append(metricTile("Sync", argocd.syncStatus || "-", argocd.syncStatus === "Synced" ? "ok" : "warn"));
+  argoCard.append(metricTile("Health", argocd.healthStatus || "-", argocd.healthStatus === "Healthy" ? "ok" : "warn"));
+  if (argocd.reason) argoCard.append(createElement("small", "", argocd.reason));
+
+  const promCard = createElement("article", "live-card");
+  promCard.append(createElement("h3", "", "Prometheus"));
+  promCard.append(renderStatus(prometheus.status || "unavailable"));
+  promCard.append(createElement("p", "", `${prometheus.totalAlerts ?? 0} total alerts · ${prometheus.firingAlerts ?? 0} firing`));
+  const alerts = createElement("ul", "compact-list");
+  (prometheus.alerts || []).forEach((alert) => {
+    const item = createElement("li", "");
+    item.append(createElement("strong", "", alert.name));
+    item.append(createElement("span", "", alert.summary || alert.description || alert.severity));
+    item.append(createElement("em", "", alert.namespace || "-"));
+    alerts.append(item);
+  });
+  if (prometheus.reason) alerts.append(createElement("li", "", prometheus.reason));
+  promCard.append(alerts);
+
+  grid.append(githubCard, argoCard, promCard);
+  section.append(grid);
   return section;
 }
 
@@ -370,6 +417,7 @@ function render(data, source) {
   app.append(renderSystemStatus(data));
 
   const layout = createElement("main", "dashboard-layout");
+  layout.append(renderLiveIntegrations(data));
   layout.append(renderTimeline(data));
   layout.append(renderHealth(data));
   layout.append(renderAlerts(data));

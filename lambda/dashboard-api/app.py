@@ -1,6 +1,9 @@
 import json
 import os
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from decimal import Decimal
 
 try:
@@ -12,6 +15,16 @@ except ImportError:
 EVENT_BUS_NAME = os.environ.get("EVENT_BUS_NAME", "")
 ACTION_TABLE_NAME = os.environ.get("ACTION_TABLE_NAME", "")
 RESULT_BUCKET = os.environ.get("RESULT_BUCKET", "")
+GITHUB_TOKEN_SECRET_ARN = os.environ.get("GITHUB_TOKEN_SECRET_ARN", "")
+GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY", "hj-3/gympt-app")
+GITHUB_WORKFLOW_FILE = os.environ.get("GITHUB_WORKFLOW_FILE", "backend-api-ci.yml")
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main")
+ARGOCD_URL = os.environ.get("ARGOCD_URL", "https://argocd.g2mpt.com").rstrip("/")
+ARGOCD_APP = os.environ.get("ARGOCD_APP", "backend-api-prod")
+ARGOCD_TOKEN_SECRET_ARN = os.environ.get("ARGOCD_TOKEN_SECRET_ARN", "")
+PROMETHEUS_URL = os.environ.get("PROMETHEUS_URL", "http://kube-prometheus-stack-prometheus.monitoring.svc:9090").rstrip("/")
+HTTP_TIMEOUT_SECONDS = float(os.environ.get("DASHBOARD_HTTP_TIMEOUT_SECONDS", "4"))
+_SECRET_CACHE = {}
 ALLOWED_ACTIONS = {
     "rollback",
     "manual_fix",
@@ -70,6 +83,168 @@ def _s3():
     if boto3 is None or not RESULT_BUCKET:
         return None
     return boto3.client("s3")
+
+
+def _parse_secret(secret, candidate_keys):
+    if not secret:
+        return ""
+    try:
+        parsed = json.loads(secret)
+    except json.JSONDecodeError:
+        return secret
+    if isinstance(parsed, dict):
+        for key in candidate_keys:
+            if parsed.get(key):
+                return parsed[key]
+        if len(parsed) == 1:
+            return next(iter(parsed.values()))
+    return secret
+
+
+def _secret_value(secret_arn, env_name, candidate_keys):
+    if os.environ.get(env_name):
+        return os.environ[env_name]
+    if secret_arn in _SECRET_CACHE:
+        return _SECRET_CACHE[secret_arn]
+    if not secret_arn or boto3 is None:
+        return ""
+    response = boto3.client("secretsmanager").get_secret_value(SecretId=secret_arn)
+    value = _parse_secret(response.get("SecretString", ""), candidate_keys)
+    _SECRET_CACHE[secret_arn] = value
+    return value
+
+
+def _http_json(url, headers=None):
+    request = urllib.request.Request(url, headers=headers or {}, method="GET")
+    with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _unavailable(source, reason):
+    return {"status": "unavailable", "source": source, "reason": str(reason)}
+
+
+def _github_token():
+    return _secret_value(
+        GITHUB_TOKEN_SECRET_ARN,
+        "GITHUB_TOKEN",
+        ("token", "github_token", "GITHUB_TOKEN", "dispatch_token", "GH_WORKFLOW_DISPATCH_TOKEN"),
+    )
+
+
+def _github_workflow_status():
+    workflow = urllib.parse.quote(GITHUB_WORKFLOW_FILE, safe="")
+    query = urllib.parse.urlencode({"branch": GITHUB_BRANCH, "per_page": 5})
+    url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/actions/workflows/{workflow}/runs?{query}"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "cd-quality-gate-dashboard",
+    }
+    try:
+        token = _github_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        payload = _http_json(url, headers)
+        runs = payload.get("workflow_runs", [])
+        latest = runs[0] if runs else {}
+        conclusion = latest.get("conclusion")
+        status = latest.get("status", "unknown")
+        dashboard_status = "complete" if conclusion == "success" else "failed" if conclusion else "waiting"
+        return {
+            "status": dashboard_status,
+            "source": "github",
+            "repository": GITHUB_REPOSITORY,
+            "workflow": GITHUB_WORKFLOW_FILE,
+            "branch": GITHUB_BRANCH,
+            "latest": {
+                "id": latest.get("id"),
+                "runNumber": latest.get("run_number"),
+                "status": status,
+                "conclusion": conclusion or "",
+                "event": latest.get("event", ""),
+                "headBranch": latest.get("head_branch", ""),
+                "headSha": latest.get("head_sha", ""),
+                "createdAt": latest.get("created_at", ""),
+                "updatedAt": latest.get("updated_at", ""),
+                "url": latest.get("html_url", f"https://github.com/{GITHUB_REPOSITORY}/actions/workflows/{GITHUB_WORKFLOW_FILE}"),
+            },
+            "runs": [
+                {
+                    "runNumber": run.get("run_number"),
+                    "status": run.get("status", ""),
+                    "conclusion": run.get("conclusion") or "",
+                    "headSha": run.get("head_sha", "")[:7],
+                    "updatedAt": run.get("updated_at", ""),
+                    "url": run.get("html_url", ""),
+                }
+                for run in runs[:5]
+            ],
+        }
+    except Exception as exc:
+        return _unavailable("github", exc)
+
+
+def _argocd_token():
+    return _secret_value(ARGOCD_TOKEN_SECRET_ARN, "ARGOCD_TOKEN", ("token", "argocd_token", "ARGOCD_TOKEN"))
+
+
+def _argocd_status():
+    url = f"{ARGOCD_URL}/api/v1/applications/{urllib.parse.quote(ARGOCD_APP, safe='')}"
+    headers = {"Accept": "application/json"}
+    try:
+        token = _argocd_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        payload = _http_json(url, headers)
+        status = payload.get("status", {})
+        sync = status.get("sync", {})
+        health = status.get("health", {})
+        operation = status.get("operationState", {})
+        sync_status = sync.get("status", "Unknown")
+        health_status = health.get("status", "Unknown")
+        dashboard_status = "complete" if sync_status == "Synced" and health_status == "Healthy" else "warning"
+        return {
+            "status": dashboard_status,
+            "source": "argocd",
+            "app": ARGOCD_APP,
+            "syncStatus": sync_status,
+            "healthStatus": health_status,
+            "revision": sync.get("revision", ""),
+            "operationPhase": operation.get("phase", ""),
+            "message": health.get("message", ""),
+            "url": f"{ARGOCD_URL}/applications/{ARGOCD_APP}",
+        }
+    except Exception as exc:
+        return _unavailable("argocd", exc)
+
+
+def _prometheus_status():
+    url = f"{PROMETHEUS_URL}/api/v1/alerts"
+    try:
+        payload = _http_json(url, {"Accept": "application/json"})
+        alerts = payload.get("data", {}).get("alerts", [])
+        firing = [alert for alert in alerts if alert.get("state") == "firing"]
+        return {
+            "status": "failed" if firing else "complete",
+            "source": "prometheus",
+            "url": PROMETHEUS_URL,
+            "totalAlerts": len(alerts),
+            "firingAlerts": len(firing),
+            "alerts": [
+                {
+                    "name": alert.get("labels", {}).get("alertname", "unknown"),
+                    "severity": alert.get("labels", {}).get("severity", "unknown"),
+                    "namespace": alert.get("labels", {}).get("namespace", ""),
+                    "summary": alert.get("annotations", {}).get("summary", ""),
+                    "description": alert.get("annotations", {}).get("description", ""),
+                    "activeAt": alert.get("activeAt", ""),
+                }
+                for alert in firing[:20]
+            ],
+        }
+    except Exception as exc:
+        return _unavailable("prometheus", exc)
 
 
 def _list_actions():
@@ -143,11 +318,16 @@ def _base_dashboard():
             },
         },
         "alertGroups": [],
+        "live": {
+            "github": {"status": "waiting", "source": "github"},
+            "argocd": {"status": "waiting", "source": "argocd"},
+            "prometheus": {"status": "waiting", "source": "prometheus"},
+        },
         "links": {
             "grafana": "https://grafana.g2mpt.com",
-            "prometheus": "http://kube-prometheus-stack-prometheus.monitoring.svc:9090",
-            "argocd": "https://argocd.g2mpt.com/applications/backend-api-prod",
-            "githubRun": "https://github.com/hj-3/gympt-app/actions/workflows/backend-api-ci.yml",
+            "prometheus": PROMETHEUS_URL,
+            "argocd": f"{ARGOCD_URL}/applications/{ARGOCD_APP}",
+            "githubRun": f"https://github.com/{GITHUB_REPOSITORY}/actions/workflows/{GITHUB_WORKFLOW_FILE}",
             "slackChannel": "#cd-deploy-alarm",
         },
         "analysis": {
@@ -245,18 +425,101 @@ def _apply_latest_analysis(dashboard):
     return dashboard
 
 
+def _apply_live_integrations(dashboard):
+    github = _github_workflow_status()
+    argocd = _argocd_status()
+    prometheus = _prometheus_status()
+    dashboard["live"] = {"github": github, "argocd": argocd, "prometheus": prometheus}
+
+    latest = github.get("latest") or {}
+    if latest.get("headSha"):
+        dashboard["deployment"]["commitSha"] = latest["headSha"]
+    if latest.get("runNumber") and latest.get("headSha"):
+        dashboard["deployment"]["imageTag"] = f"backend-api:{latest['runNumber']}-{latest['headSha'][:7]}"
+    if latest.get("updatedAt"):
+        dashboard["deployment"]["lastUpdatedAt"] = latest["updatedAt"]
+
+    if prometheus.get("status") == "failed":
+        dashboard["deployment"]["status"] = "failed"
+        dashboard["healthWindow"]["result"] = "failed"
+    elif github.get("status") == "complete" and argocd.get("status") == "complete" and prometheus.get("status") == "complete":
+        dashboard["deployment"]["status"] = "complete"
+        dashboard["healthWindow"]["result"] = "complete"
+    elif any(item.get("status") == "unavailable" for item in (github, argocd, prometheus)):
+        dashboard["deployment"]["status"] = "warning"
+        dashboard["healthWindow"]["result"] = "waiting"
+    else:
+        dashboard["deployment"]["status"] = "waiting"
+
+    timeline_status = {
+        "push": github.get("status", "waiting"),
+        "gitops": "complete" if github.get("status") == "complete" else "waiting",
+        "argocd": argocd.get("status", "waiting"),
+        "gate": prometheus.get("status", "waiting"),
+    }
+    timeline_detail = {
+        "push": f"{GITHUB_WORKFLOW_FILE}: {latest.get('status', 'unknown')} / {latest.get('conclusion') or '-'}",
+        "gitops": "GitOps values update is inferred from successful backend workflow.",
+        "argocd": f"sync={argocd.get('syncStatus', '-')}, health={argocd.get('healthStatus', '-')}",
+        "gate": f"{prometheus.get('firingAlerts', 0)} firing alert(s) from Prometheus.",
+    }
+    dashboard["timeline"] = [
+        {
+            **item,
+            "status": timeline_status.get(item["id"], item["status"]),
+            "detail": timeline_detail.get(item["id"], item["detail"]),
+            "at": format_live_time(latest.get("updatedAt", "")) if item["id"] == "push" else item["at"],
+        }
+        for item in dashboard["timeline"]
+    ]
+
+    if prometheus.get("alerts"):
+        dashboard["alertGroups"] = [
+            {
+                "name": "Prometheus firing alerts",
+                "severity": "critical",
+                "count": prometheus.get("firingAlerts", 0),
+                "dashboards": ["prometheus", "grafana"],
+                "alerts": [
+                    {
+                        "name": alert.get("name", "unknown"),
+                        "severity": alert.get("severity", "unknown"),
+                        "summary": alert.get("summary") or alert.get("description", ""),
+                        "value": alert.get("namespace", ""),
+                    }
+                    for alert in prometheus["alerts"]
+                ],
+            }
+        ]
+    elif prometheus.get("status") == "complete":
+        dashboard["alertGroups"] = [
+            {
+                "name": "Prometheus firing alerts",
+                "severity": "available",
+                "count": 0,
+                "dashboards": ["prometheus", "grafana"],
+                "alerts": [],
+            }
+        ]
+    return dashboard
+
+
+def format_live_time(value):
+    return value or "-"
+
+
 def _dashboard():
     actions = _list_actions()
-    dashboard = _apply_latest_analysis(_base_dashboard())
+    dashboard = _apply_live_integrations(_apply_latest_analysis(_base_dashboard()))
     dashboard["system"] = {
         "backend": {"status": "connected", "api": "dashboard-api-lambda"},
         "database": {"status": "connected", "type": "dynamodb", "records": len(actions)},
         "eventBridge": {"status": "connected" if EVENT_BUS_NAME else "unavailable", "bus": EVENT_BUS_NAME},
         "resultBucket": {"status": "connected" if RESULT_BUCKET else "unavailable", "bucket": RESULT_BUCKET},
-        "prometheus": {"status": "linked", "url": dashboard["links"]["prometheus"]},
+        "prometheus": {"status": dashboard["live"]["prometheus"]["status"], "url": dashboard["links"]["prometheus"]},
         "grafana": {"status": "linked", "url": dashboard["links"]["grafana"]},
-        "argocd": {"status": "linked", "url": dashboard["links"]["argocd"]},
-        "githubActions": {"status": "linked", "url": dashboard["links"]["githubRun"]},
+        "argocd": {"status": dashboard["live"]["argocd"]["status"], "url": dashboard["links"]["argocd"]},
+        "githubActions": {"status": dashboard["live"]["github"]["status"], "url": dashboard["links"]["githubRun"]},
         "slack": {"status": "linked", "channel": dashboard["links"]["slackChannel"]},
     }
     dashboard["actionHistory"] = actions

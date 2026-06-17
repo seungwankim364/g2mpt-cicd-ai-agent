@@ -1136,16 +1136,43 @@ alert groups
 AI analysis summary
 approval/action history
 Terraform resource status
+GitHub Actions latest workflow runs
+Argo CD sync/health status
+Prometheus current firing alerts
 Grafana/Prometheus/Argo CD/GitHub Actions/Slack links
 ```
 
-현재 한계:
+Live integration:
 
 ```text
-GitHub Actions job 실패 상세를 GitHub API로 직접 조회하지는 않는다.
-Prometheus metric을 dashboard API가 직접 query하지는 않는다.
-Argo CD API를 직접 query하지는 않는다.
-대신 Quality Gate 산출물, S3 summary, link 기반으로 운영자가 빠르게 이동할 수 있게 한다.
+Dashboard API Lambda는 GitHub Actions API, Argo CD API, Prometheus API를 직접 조회한다.
+
+GitHub Actions:
+  hj-3/gympt-app backend-api-ci.yml 최근 workflow run 상태 조회
+
+Argo CD:
+  backend-api-prod Application sync status / health status 조회
+
+Prometheus:
+  /api/v1/alerts 기준 firing alert 조회
+
+Grafana:
+  상세 분석 dashboard link 제공
+
+Slack:
+  #cd-deploy-alarm channel link/status 제공
+  Slack message history 직접 조회는 하지 않는다.
+```
+
+현재 운영 조건:
+
+```text
+GitHub private repo 조회에는 github_token_secret_arn이 필요하다.
+Argo CD API 조회에는 dashboard_argocd_token_secret_arn 또는 접근 가능한 인증 방식이 필요하다.
+Prometheus 기본 URL은 Kubernetes 내부 service 주소이므로, Lambda에서 접근하려면 네트워크 경로가 필요하다.
+
+토큰 또는 네트워크 접근이 없으면 dashboard 전체가 실패하지 않고,
+해당 integration을 unavailable로 표시한다.
 ```
 
 ---

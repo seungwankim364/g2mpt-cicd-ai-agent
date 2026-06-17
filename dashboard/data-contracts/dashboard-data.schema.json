@@ -9,6 +9,7 @@
     "healthWindow",
     "alertGroups",
     "links",
+    "live",
     "analysis",
     "approvals",
     "infra"
@@ -89,6 +90,15 @@
       }
     },
     "links": { "type": "object" },
+    "live": {
+      "type": "object",
+      "required": ["github", "argocd", "prometheus"],
+      "properties": {
+        "github": { "type": "object" },
+        "argocd": { "type": "object" },
+        "prometheus": { "type": "object" }
+      }
+    },
     "analysis": {
       "type": "object",
       "required": ["engine", "model", "confidence", "recommendedAction", "summary"],
