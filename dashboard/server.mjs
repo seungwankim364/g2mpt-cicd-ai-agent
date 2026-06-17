@@ -13,7 +13,6 @@ const actionLogPath = join(runtimeDir, "actions.json");
 const port = Number(process.env.DASHBOARD_PORT || 5173);
 const allowedActions = [
   "rollback",
-  "dr",
   "manual_fix",
   "change",
   "restart_deployment",
@@ -121,7 +120,6 @@ function dispatchPayload(action, base = sampleDashboard) {
     targetImageTag: base.deployment.rollbackImageTag || base.deployment.imageTag,
     workflow: {
       rollback: "rollback.yml",
-      dr: "dr-failover.yml",
       manual_fix: "manual-fix.yml",
       change: "change-apply.yml",
       restart_deployment: "change-apply.yml",

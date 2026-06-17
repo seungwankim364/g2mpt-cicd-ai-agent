@@ -71,8 +71,11 @@ jobs:
       HEALTH_CHECK_INTERVAL_SECONDS: 60
 
     steps:
-      - name: Checkout
+      - name: Checkout CD Quality Gate repository
         uses: actions/checkout@v4
+        with:
+          repository: seungwankim364/g2mpt-cicd-ai-agent
+          ref: main
 
       - name: Configure AWS credentials
         if: env.AWS_ROLE_ARN != ''
@@ -111,6 +114,7 @@ jobs:
 
       - name: Send Slack first alert
         if: steps.evaluate.outcome == 'failure'
+        continue-on-error: true
         run: |
           scripts/quality-gate/send-slack-first-alert.py \
             --result-file quality-gate-result.json \
@@ -119,6 +123,7 @@ jobs:
 
       - name: Send Slack deploy complete alert
         if: steps.evaluate.outcome == 'success'
+        continue-on-error: true
         run: |
           scripts/quality-gate/send-slack-deploy-success.py \
             --service "$SERVICE_NAME" \

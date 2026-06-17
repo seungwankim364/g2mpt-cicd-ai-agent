@@ -92,7 +92,7 @@ Slack 1차 실패 알림
 EventBridge DeploymentFailed 이벤트 발행
 Lambda + Athena + Bedrock AI 분석
 Slack 2차 분석/승인 알림
-승인된 rollback/DR/manual_fix/change 실행
+승인된 rollback/manual_fix/change 실행
 dashboard/control center 제공
 Terraform으로 AWS 리소스 관리
 ```
@@ -628,7 +628,7 @@ AI 분석 요약
 alert evidence
 Athena log evidence
 추천 조치
-rollback / DR / change / manual fix 승인 버튼
+rollback / change / manual fix 승인 버튼
 ```
 
 승인 버튼을 누르면 Slack Interactivity가 API Gateway로 요청을 보낸다.
@@ -694,10 +694,6 @@ lambda/deployment-action-executor/app.py
 rollback:
   repo: seungwankim364/g2mpt-cicd-ai-agent
   workflow: rollback.yml
-
-dr:
-  repo: seungwankim364/g2mpt-cicd-ai-agent
-  workflow: dr-failover.yml
 
 manual_fix:
   repo: seungwankim364/g2mpt-cicd-ai-agent
@@ -794,7 +790,7 @@ GitHub Secret GH_WORKFLOW_DISPATCH_TOKEN:
   rollback.yml이 gympt-gitops values-prod.yaml을 commit/push하기 위한 token
 ```
 
-## 13. DR/manual fix/change 흐름
+## 13. manual fix/change 흐름
 
 이제 `manual_fix/change`는 큰 버튼 하나가 아니라 실행 가능한 runbook action으로 쪼갠다.
 
@@ -829,20 +825,6 @@ open_change_pr
   -> change-apply.yml
   -> GitHub issue/artifact 생성
   -> GitOps/Terraform/app PR 중 하나로 연결
-```
-
-DR:
-
-```text
-.github/workflows/dr-failover.yml
-```
-
-현재 상태:
-
-```text
-DR_VALUES_FILE, DR_YAML_PATH, DR_TARGET_VALUE repository variable이 설정되어 있으면
-scripts/cd/update-gitops-yaml-value.sh로 GitOps DR failover 값을 자동 갱신한다.
-값이 없으면 DR review issue/artifact만 생성하고 멈춘다.
 ```
 
 manual fix:
@@ -956,7 +938,7 @@ if fail
   -> slack-approval-handler Lambda
   -> EventBridge DeploymentActionApproved
   -> deployment-action-executor Lambda
-  -> rollback.yml / dr-failover.yml / manual-fix.yml / change-apply.yml
+  -> rollback.yml / manual-fix.yml / change-apply.yml
 
 rollback path
   -> rollback.yml

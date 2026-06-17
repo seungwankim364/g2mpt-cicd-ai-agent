@@ -119,7 +119,7 @@ export const sampleDashboard = {
     { action: "increase_memory", status: "available", approver: "-", target: "memory request/limit", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
     { action: "increase_hpa", status: "available", approver: "-", target: "autoscaling.maxReplicas=30", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
     { action: "open_fix_issue", status: "available", approver: "-", target: "fix issue", workflow: "manual-fix.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" },
-    { action: "dr", status: "available", approver: "-", target: "configured DR GitOps patch", workflow: "dr-failover.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" }
+    { action: "open_change_pr", status: "available", approver: "-", target: "change issue", workflow: "change-apply.yml", repo: "seungwankim364/g2mpt-cicd-ai-agent" }
   ],
   infra: {
     terraformState: "destroyed",

@@ -62,7 +62,7 @@ alerts:
       - application-error-patterns
     recommendedActions:
       - manual_fix
-      - dr
+      - open_fix_issue
 
   SQSDLQMessages:
     severity: critical
@@ -71,7 +71,7 @@ alerts:
       - application-error-patterns
     recommendedActions:
       - manual_fix
-      - dr
+      - open_fix_issue
 
   NodeHighCPUUsage:
     severity: warning
@@ -80,7 +80,7 @@ alerts:
       - application-error-patterns
     recommendedActions:
       - observe
-      - dr
+      - increase_hpa
 
   PodRestartFrequent:
     severity: warning
@@ -107,7 +107,7 @@ alerts:
       - application-error-patterns
     recommendedActions:
       - manual_fix
-      - dr
+      - open_fix_issue
 
   RedisConnectionError:
     severity: critical
@@ -115,7 +115,7 @@ alerts:
     athenaQueries:
       - application-error-patterns
     recommendedActions:
-      - dr
+      - open_fix_issue
       - manual_fix
 
   RedisHighMemory:

@@ -70,8 +70,12 @@ async function refreshDashboard() {
 async function recordApproval(action) {
   try {
     const result = await postJson("/api/actions", { action, approvedBy: "dashboard-local" });
-    render(result.dashboard, "local backend");
-    notify(`${action} action recorded. Dispatch payload is stored in dashboard/runtime/actions.json.`, "success");
+    if (result.dashboard) {
+      render(result.dashboard, "local backend");
+    } else {
+      await refreshDashboard();
+    }
+    notify(`${action} action recorded.`, "success");
   } catch (error) {
     notify(`Unable to record ${action}: ${error.message}`, "error");
   }

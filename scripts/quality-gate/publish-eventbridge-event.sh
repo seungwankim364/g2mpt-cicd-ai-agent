@@ -52,8 +52,25 @@ if [[ "$DRY_RUN" == "true" || -z "${EVENT_BUS_NAME:-}" ]]; then
   exit 0
 fi
 
+entries_file="$(mktemp)"
+trap 'rm -f "$entries_file"' EXIT
+python3 - "$OUTPUT_FILE" "$EVENT_BUS_NAME" "$entries_file" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+entry = {
+    "Source": "cd.quality-gate",
+    "DetailType": "DeploymentFailed",
+    "EventBusName": sys.argv[2],
+    "Detail": json.dumps(payload["detail"], separators=(",", ":")),
+}
+Path(sys.argv[3]).write_text(json.dumps([entry], separators=(",", ":")), encoding="utf-8")
+PY
+
 aws events put-events \
   --region "$AWS_REGION" \
-  --entries "Source=cd.quality-gate,DetailType=DeploymentFailed,EventBusName=${EVENT_BUS_NAME},Detail=$(jq -c '.detail' "$OUTPUT_FILE")"
+  --entries "file://${entries_file}"
 
 echo "Published DeploymentFailed event to EventBridge"

@@ -33,10 +33,9 @@ def build_second_alert(recommendation: dict, links: dict | None = None) -> dict:
         "currentImageTag": recommendation.get("currentImageTag", "unknown"),
         "targetImageTag": recommendation.get("rollbackImageTag", ""),
     }
-    return {
-        "text": text,
-        "blocks": [
-            {"type": "section", "text": {"type": "mrkdwn", "text": text}},
+    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": text}}]
+    if action_type != "observe":
+        blocks.append(
             {
                 "type": "actions",
                 "elements": [
@@ -54,6 +53,10 @@ def build_second_alert(recommendation: dict, links: dict | None = None) -> dict:
                         },
                     }
                 ],
-            },
-        ],
+            }
+        )
+
+    return {
+        "text": text,
+        "blocks": blocks,
     }
