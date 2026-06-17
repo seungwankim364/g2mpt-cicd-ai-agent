@@ -88,6 +88,7 @@ jobs:
         env:
           K8S_NAMESPACE: ${{ inputs.namespace }}
           K8S_DEPLOYMENT: ${{ inputs.deployment }}
+          EXPECTED_IMAGE: ${{ inputs.image_tag }}
         run: scripts/cd/check-k8s-rollout.sh
 
       - name: Run 5-minute health check window

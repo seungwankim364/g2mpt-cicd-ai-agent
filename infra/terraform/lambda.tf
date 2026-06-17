@@ -87,6 +87,37 @@ resource "aws_lambda_function" "deployment_action_executor" {
   tags = local.tags
 }
 
+resource "aws_lambda_function" "github_webhook_handler" {
+  function_name                  = "${local.name_prefix}-github-webhook-handler"
+  role                           = aws_iam_role.github_webhook_handler.arn
+  handler                        = "app.handler"
+  runtime                        = "python3.12"
+  filename                       = "${path.module}/../../build/github-webhook-handler.zip"
+  timeout                        = 30
+  memory_size                    = 256
+  reserved_concurrent_executions = 2
+
+  environment {
+    variables = {
+      GITHUB_TOKEN_SECRET_ARN    = var.github_token_secret_arn
+      GITHUB_WEBHOOK_SECRET_ARN  = var.github_webhook_secret_arn
+      EXPECTED_REPOSITORY        = var.app_deploy_workflow_repo
+      EXPECTED_WORKFLOW_NAME     = var.app_deploy_workflow_name
+      EXPECTED_BRANCH            = var.app_deploy_workflow_ref
+      QUALITY_GATE_REPO          = var.quality_gate_workflow_repo
+      QUALITY_GATE_WORKFLOW_FILE = var.quality_gate_workflow_file
+      QUALITY_GATE_REF           = var.quality_gate_workflow_ref
+      SERVICE_NAME               = "backend-api"
+      ENVIRONMENT                = var.environment
+      K8S_NAMESPACE              = "gympt-prod"
+      K8S_DEPLOYMENT             = "backend-api-prod"
+      IMAGE_REPOSITORY           = "337112169365.dkr.ecr.${var.aws_region}.amazonaws.com/gympt-prod/backend-api"
+    }
+  }
+
+  tags = local.tags
+}
+
 resource "aws_cloudwatch_event_target" "deployment_action_executor" {
   rule           = aws_cloudwatch_event_rule.deployment_action_approved.name
   event_bus_name = aws_cloudwatch_event_bus.cd_quality_gate.name

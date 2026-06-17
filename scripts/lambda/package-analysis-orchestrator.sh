@@ -11,8 +11,10 @@ ACTION_EXECUTOR_BUILD_DIR="$ROOT_DIR/build/deployment-action-executor"
 ACTION_EXECUTOR_ZIP_FILE="$ROOT_DIR/build/deployment-action-executor.zip"
 DASHBOARD_API_BUILD_DIR="$ROOT_DIR/build/dashboard-api"
 DASHBOARD_API_ZIP_FILE="$ROOT_DIR/build/dashboard-api.zip"
+GITHUB_WEBHOOK_BUILD_DIR="$ROOT_DIR/build/github-webhook-handler"
+GITHUB_WEBHOOK_ZIP_FILE="$ROOT_DIR/build/github-webhook-handler.zip"
 
-rm -rf "$BUILD_DIR" "$ZIP_FILE" "$SLACK_HANDLER_BUILD_DIR" "$SLACK_HANDLER_ZIP_FILE" "$ACTION_EXECUTOR_BUILD_DIR" "$ACTION_EXECUTOR_ZIP_FILE" "$DASHBOARD_API_BUILD_DIR" "$DASHBOARD_API_ZIP_FILE"
+rm -rf "$BUILD_DIR" "$ZIP_FILE" "$SLACK_HANDLER_BUILD_DIR" "$SLACK_HANDLER_ZIP_FILE" "$ACTION_EXECUTOR_BUILD_DIR" "$ACTION_EXECUTOR_ZIP_FILE" "$DASHBOARD_API_BUILD_DIR" "$DASHBOARD_API_ZIP_FILE" "$GITHUB_WEBHOOK_BUILD_DIR" "$GITHUB_WEBHOOK_ZIP_FILE"
 mkdir -p "$BUILD_DIR"
 
 cp "$LAMBDA_DIR/app.py" "$BUILD_DIR/app.py"
@@ -76,3 +78,12 @@ cp "$ROOT_DIR/lambda/dashboard-api/app.py" "$DASHBOARD_API_BUILD_DIR/app.py"
 )
 python3 -m py_compile "$DASHBOARD_API_BUILD_DIR/app.py"
 echo "Created $DASHBOARD_API_ZIP_FILE"
+
+mkdir -p "$GITHUB_WEBHOOK_BUILD_DIR"
+cp "$ROOT_DIR/lambda/github-webhook-handler/app.py" "$GITHUB_WEBHOOK_BUILD_DIR/app.py"
+(
+  cd "$GITHUB_WEBHOOK_BUILD_DIR"
+  zip -qr "$GITHUB_WEBHOOK_ZIP_FILE" .
+)
+python3 -m py_compile "$GITHUB_WEBHOOK_BUILD_DIR/app.py"
+echo "Created $GITHUB_WEBHOOK_ZIP_FILE"

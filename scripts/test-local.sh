@@ -20,6 +20,7 @@ python3 -m py_compile \
   lambda/analysis-orchestrator/*.py \
   lambda/slack-approval-handler/*.py \
   lambda/deployment-action-executor/*.py \
+  lambda/github-webhook-handler/*.py \
   ai-agent/app/*.py
 
 echo "[3/8] JSON fixtures and schemas"
@@ -134,6 +135,42 @@ PYTHONPATH=ai-agent python3 -m app.main \
   --slack-output-file "$TMP_DIR/slack-second-alert.json"
 
 LOCAL_RESULT_DIR="$TMP_DIR/lambda-results" python3 lambda/analysis-orchestrator/app.py >/dev/null
+
+GITHUB_WEBHOOK_SECRET=local-secret python3 - <<'PY'
+import hashlib
+import hmac
+import importlib.util
+import json
+
+spec = importlib.util.spec_from_file_location("github_webhook", "lambda/github-webhook-handler/app.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+payload = {
+    "action": "completed",
+    "repository": {"full_name": "hj-3/gympt-app"},
+    "workflow_run": {
+        "name": "Backend API CI/CD",
+        "conclusion": "success",
+        "head_branch": "main",
+        "head_sha": "5c35fc1abcd",
+        "run_number": 115,
+        "event": "push",
+    },
+}
+raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+signature = "sha256=" + hmac.new(b"local-secret", raw, hashlib.sha256).hexdigest()
+event = {"headers": {"X-GitHub-Event": "workflow_run", "X-Hub-Signature-256": signature}, "body": raw.decode("utf-8")}
+
+allowed, checks = module._should_dispatch(payload)
+assert allowed, checks
+assert module._quality_gate_inputs(payload)["image_tag"].endswith(":115-5c35fc1")
+assert module._verify_signature(module._headers(event), module._body(event))
+
+payload["workflow_run"]["conclusion"] = "failure"
+allowed, checks = module._should_dispatch(payload)
+assert not allowed and not checks["conclusion"]
+PY
 
 echo "[8/8] AWS terraform destroy script help"
 scripts/aws/destroy-terraform-stack.sh --help >/dev/null

@@ -57,6 +57,12 @@ variable "github_token_secret_arn" {
   default = ""
 }
 
+variable "github_webhook_secret_arn" {
+  type        = string
+  default     = ""
+  description = "AWS Secrets Manager ARN for the GitHub webhook secret used by hj-3/gympt-app repository webhooks."
+}
+
 variable "bedrock_enabled" {
   type        = bool
   default     = true
@@ -100,6 +106,26 @@ variable "app_deploy_workflow_file" {
 }
 
 variable "app_deploy_workflow_ref" {
+  type    = string
+  default = "main"
+}
+
+variable "app_deploy_workflow_name" {
+  type    = string
+  default = "Backend API CI/CD"
+}
+
+variable "quality_gate_workflow_repo" {
+  type    = string
+  default = "seungwankim364/g2mpt-cicd-ai-agent"
+}
+
+variable "quality_gate_workflow_file" {
+  type    = string
+  default = "quality-gate.yml"
+}
+
+variable "quality_gate_workflow_ref" {
   type    = string
   default = "main"
 }

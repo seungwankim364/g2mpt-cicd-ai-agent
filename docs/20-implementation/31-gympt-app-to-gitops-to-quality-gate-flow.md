@@ -1,56 +1,233 @@
-# DOC-36. GymPT App to GitOps to Quality Gate Flow
+# DOC-31. GymPT App to GitOps to Quality Gate Flow
 
-이 문서는 `gympt-apps -> gympt-gitops -> cd-quality-gate-architecture` 흐름을 처음부터 끝까지 이해하기 위한 상세 실행 흐름이다.
+이 문서는 `gympt-app -> gympt-gitops -> cd-quality-gate-architecture`가 어떻게 연결되는지 처음부터 끝까지 설명한다.
 
-목표는 아래 세 가지다.
+중요한 전제는 아래다.
 
 ```text
-1. 어떤 repo가 어떤 책임을 갖는지 구분한다.
-2. 배포 성공/실패/rollback 흐름에서 어떤 파일이 실행되는지 연결한다.
-3. 사용자가 어느 지점에서 무엇을 확인해야 하는지 판단할 수 있게 한다.
+gympt-app:
+  실제 서비스 코드, 빌드, 이미지 생성, 기존 배포 시작점
+
+gympt-gitops:
+  EKS에 배포할 Kubernetes desired state 저장소
+
+cd-quality-gate-architecture:
+  기존 배포가 끝난 뒤 배포가 진짜 안전한지 검증하고,
+  실패하면 Slack 알림, AI 분석, 승인 기반 rollback/fix/change를 실행하는 개인 파트
 ```
 
-## 1. 세 repo의 역할
+`gympt-ops` 폴더는 참고용이다.  
+이 프로젝트는 `gympt-ops` 파일을 직접 수정하지 않고, 기존 서비스 배포 흐름 뒤에 Quality Gate를 붙인다.
 
-### 1.1 gympt-apps
+---
 
-`gympt-apps`는 실제 서비스 코드를 빌드하고 이미지를 만드는 시작점이다.
+## 1. 전체 원칙
 
-책임:
+CI/CD는 역할을 분리한다.
 
 ```text
-소스 코드 변경
-테스트
-Docker image build
+GitHub Actions
+  -> 소스 코드 빌드
+  -> 테스트
+  -> Docker image 생성
+  -> ECR push
+  -> GitOps values image tag 수정
+
+GitOps Repository
+  -> Kubernetes/Helm 배포 선언 저장
+  -> 어떤 image tag를 EKS에 배포할지 Git으로 기록
+
+Argo CD
+  -> GitOps repo를 감시
+  -> Git 상태와 EKS 상태를 동기화
+
+CD Quality Gate
+  -> 배포 후 rollout 확인
+  -> Prometheus 기준 5분 health check
+  -> Slack 알림
+  -> 실패 시 EventBridge/Lambda/Bedrock 분석
+  -> 승인 기반 rollback/fix/change 실행
+
+Terraform
+  -> cd-quality-gate가 쓰는 AWS 리소스 생성/삭제
+```
+
+이렇게 나누는 이유:
+
+```text
+빌드와 배포 선언은 기존 서비스 책임이다.
+배포 후 품질 검증과 장애 분석은 개인 프로젝트 책임이다.
+서로 책임을 나누면 기존 gympt-app 배포를 깨지 않고 뒤에 안전장치를 붙일 수 있다.
+```
+
+---
+
+## 2. 왜 gympt-app을 직접 수정하지 않는가
+
+이번 연결 방식은 `gympt-app` workflow 파일을 수정하지 않는다.
+
+대신 `gympt-app` repository settings에 GitHub Webhook을 추가한다.
+
+```text
+gympt-app backend workflow 완료
+-> GitHub가 workflow_run webhook 전송
+-> cd-quality-gate API Gateway 수신
+-> GitHub webhook Lambda가 검증
+-> cd-quality-gate quality-gate.yml workflow_dispatch 실행
+```
+
+이 방식을 쓰는 이유:
+
+```text
+1. gympt-app 코드와 workflow 파일을 건드리지 않는다.
+2. ECR push보다 더 정확한 시점인 workflow_run completed를 기준으로 시작한다.
+3. GitHub webhook secret으로 요청 위조를 막을 수 있다.
+4. repo, workflow name, branch, conclusion을 Lambda에서 필터링할 수 있다.
+5. cd-quality-gate 쪽 AWS/Terraform 리소스로 연결을 관리할 수 있다.
+```
+
+ECR image push 이벤트를 쓰지 않는 이유:
+
+```text
+ECR push는 "이미지가 올라갔다"는 뜻이다.
+하지만 "서비스 배포가 끝났다"는 뜻은 아니다.
+
+ECR push만 보면:
+  GitOps values update가 됐는지
+  Argo CD가 sync했는지
+  EKS rollout이 끝났는지
+  어떤 branch 배포인지
+를 추가로 추적해야 한다.
+
+그래서 실용성과 보안을 같이 보면 GitHub workflow_run webhook이 더 적합하다.
+```
+
+---
+
+## 3. Repository별 역할
+
+### 3.1 `gympt-app`
+
+`gympt-app`은 실제 서비스 코드가 있는 repo다.
+
+대표 역할:
+
+```text
+frontend 코드 빌드
+backend-api 코드 빌드
+Docker image 생성
 ECR push
-GitOps values image tag update
-필요 시 cd-quality-gate workflow 호출
+gympt-gitops values 파일 image tag 수정
 ```
 
-대표 흐름:
+읽는 파일:
 
 ```text
-backend-api 코드 변경
--> GitHub Actions 실행
--> test/build
--> Docker image 생성
--> ECR push
--> gympt-gitops values-prod.yaml image.tag 갱신
+../gympt-ops/gympt-app/.github/workflows/backend-api-ci.yml
 ```
 
-중요한 점:
+이 workflow가 하는 일:
 
 ```text
-gympt-apps가 새 image tag를 만든다.
-gympt-apps가 GitOps repo의 values-prod.yaml을 갱신한다.
-cd-quality-gate는 새 이미지를 만들지 않는다.
+1. backend-api 코드 push 감지
+2. Java 21 설정
+3. Gradle build
+4. Docker build
+5. ECR login
+6. ECR push
+7. hj-3/gympt-gitops checkout
+8. charts/backend-api/values-prod.yaml image.tag 수정
+9. gympt-gitops main에 commit/push
 ```
 
-### 1.2 gympt-gitops
+중요:
 
-`gympt-gitops`는 EKS에 어떤 상태를 배포할지 선언하는 repo다.
+```text
+cd-quality-gate는 정상 배포 시 image tag를 만들지 않는다.
+image tag는 gympt-app이 만든다.
+```
 
-주요 파일:
+image tag 전략:
+
+```text
+{github.run_number}-{GITHUB_SHA:0:7}
+```
+
+예:
+
+```text
+115-5c35fc1
+```
+
+Webhook Lambda도 이 규칙을 기준으로 새 image tag를 계산한다.
+
+---
+
+### 3.2 왜 frontend는 S3/CloudFront를 쓰는가
+
+프론트엔드는 일반적으로 서버에서 계속 실행되는 프로세스가 아니다.  
+React/Vite 같은 frontend는 빌드하면 정적 파일이 된다.
+
+예:
+
+```text
+index.html
+assets/*.js
+assets/*.css
+images/*
+```
+
+그래서 frontend 배포는 보통 아래처럼 간다.
+
+```text
+GitHub Actions
+-> npm ci
+-> npm run build
+-> S3 bucket에 정적 파일 업로드
+-> CloudFront cache invalidation
+```
+
+S3가 필요한 이유:
+
+```text
+정적 파일을 저장할 수 있다.
+서버를 직접 띄우지 않아도 된다.
+비용이 낮다.
+AWS CloudFront origin으로 쓰기 쉽다.
+```
+
+CloudFront가 필요한 이유:
+
+```text
+사용자에게 가까운 edge location에서 정적 파일을 전달한다.
+HTTPS 배포가 쉽다.
+캐시를 사용할 수 있다.
+배포 후 invalidation으로 최신 index.html을 보장할 수 있다.
+```
+
+캐시 전략:
+
+```text
+index.html:
+  no-cache에 가깝게 관리
+  최신 JS/CSS 파일명을 참조해야 하기 때문
+
+JS/CSS assets:
+  hash 기반 파일명이라 long cache 가능
+
+CloudFront invalidation:
+  index.html 또는 /* 무효화
+```
+
+이 frontend 배포는 Quality Gate의 backend-api 흐름과 직접 같지는 않지만, 같은 `gympt-app` 배포 책임 안에 있다.
+
+---
+
+### 3.3 `gympt-gitops`
+
+`gympt-gitops`는 EKS에 배포할 상태를 Git으로 선언하는 repo다.
+
+읽는 파일:
 
 ```text
 ../gympt-ops/gympt-gitops/charts/backend-api/values-prod.yaml
@@ -60,162 +237,98 @@ cd-quality-gate는 새 이미지를 만들지 않는다.
 ../gympt-ops/gympt-gitops/argocd/applications/prod/backend-api.yaml
 ```
 
-책임:
-
-```text
-Helm values 관리
-Kubernetes manifest 렌더링 기준 제공
-Argo CD Application source 제공
-Prometheus/Grafana monitoring reference 제공
-```
-
-`values-prod.yaml`에서 핵심은 아래다.
+핵심 values:
 
 ```yaml
 image:
   repository: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api
-  tag: "..."
+  tag: "115-5c35fc1"
 ```
 
-이 `image.tag`가 바뀌면 Argo CD가 변경을 감지하고 EKS에 반영한다.
-
-### 1.3 cd-quality-gate-architecture
-
-`cd-quality-gate-architecture`는 기존 배포가 끝난 뒤, 배포가 실제로 안전한지 검증하고 실패 시 분석/승인/조치를 연결하는 repo다.
-
-책임:
+이 값의 의미:
 
 ```text
-post-deploy rollout 확인
-Prometheus/Grafana 기준 5분 health check
-Slack 1차 실패 알림
-EventBridge DeploymentFailed 이벤트 발행
-Lambda + Athena + Bedrock AI 분석
-Slack 2차 분석/승인 알림
-승인된 rollback/manual_fix/change 실행
-dashboard/control center 제공
-Terraform으로 AWS 리소스 관리
+EKS에 backend-api를 어떤 Docker image로 띄울지 선언한다.
 ```
 
-핵심 파일:
+`gympt-app`이 이 값을 바꾸면:
 
 ```text
-.github/workflows/quality-gate.yml
-.github/workflows/cd.yml
-.github/workflows/rollback.yml
-scripts/cd/check-k8s-rollout.sh
-scripts/quality-gate/run-health-check-window.sh
-scripts/quality-gate/query-prometheus-alerts.sh
-scripts/quality-gate/query-prometheus-metrics.sh
-scripts/quality-gate/evaluate-quality-gate.py
-scripts/quality-gate/send-slack-first-alert.py
-scripts/quality-gate/send-slack-deploy-success.py
-scripts/quality-gate/publish-eventbridge-event.sh
-lambda/analysis-orchestrator/app.py
-lambda/deployment-action-executor/app.py
-lambda/slack-approval-handler/app.py
-infra/terraform/*.tf
+gympt-gitops main 변경
+-> Argo CD가 변경 감지
+-> Helm chart rendering
+-> Kubernetes Deployment update
+-> backend-api-prod pod rollout
 ```
 
-## 2. 전체 정상 배포 흐름
+---
 
-정상 배포는 아래 순서로 흐른다.
+### 3.4 왜 Helm Chart가 필요한가
+
+Kubernetes 배포 파일은 보통 Deployment, Service, Ingress, HPA, ServiceMonitor 등 여러 파일로 나뉜다.
+
+직접 YAML을 환경별로 복사하면 문제가 생긴다.
 
 ```text
-1. Developer가 gympt-apps backend-api 코드 push
-2. gympt-apps GitHub Actions 실행
-3. 테스트와 빌드 수행
-4. Docker image 생성
-5. ECR에 image push
-6. gympt-gitops values-prod.yaml image.tag 변경
-7. gympt-gitops main에 commit/push
-8. Argo CD가 GitOps 변경 감지
-9. Argo CD가 backend-api-prod를 EKS gympt-prod namespace에 sync
-10. cd-quality-gate quality-gate.yml 실행
-11. Kubernetes rollout 확인
-12. Prometheus/Grafana 기준 5분 health check
-13. 문제가 없으면 Slack #cd-deploy-alarm에 배포 완료 알림
+dev/prod 파일이 서로 달라짐
+같은 설정을 여러 곳에서 수정해야 함
+image tag, replica, resources 같은 값 관리가 어려움
 ```
 
-## 3. Step-by-step 상세 흐름
+Helm은 Kubernetes manifest template 도구다.
 
-### Step 1. gympt-apps 코드 push
-
-시작점:
+Helm Chart 구조:
 
 ```text
-repo: gympt-apps
-actor: developer
-event: push 또는 merge
-target branch: develop/main 또는 운영 배포 branch
+charts/backend-api/
+  Chart.yaml
+  values.yaml
+  values-prod.yaml
+  templates/
+    deployment.yaml
+    service.yaml
+    ingress.yaml
+    hpa.yaml
+    servicemonitor.yaml
 ```
 
-이 단계에서 일어나는 일:
+Helm이 필요한 이유:
 
 ```text
-서비스 코드가 바뀐다.
-GitHub Actions가 실행된다.
-backend-api 기준으로 test/build/image build가 수행된다.
+공통 Kubernetes 구조는 templates에 둔다.
+환경별 차이는 values-dev.yaml / values-prod.yaml로 나눈다.
+image.tag만 바꿔도 전체 Deployment manifest가 새 image로 렌더링된다.
+Argo CD가 Helm chart를 기준으로 EKS에 적용할 수 있다.
 ```
 
-이 단계에서 `cd-quality-gate-architecture`는 아직 실행되지 않는다.
+Quality Gate rollback/change도 Helm values를 바꾸는 방식으로 동작한다.
 
-### Step 2. gympt-apps가 image를 만든다
-
-일어나는 일:
+예:
 
 ```text
-Gradle/Python/Node 등 서비스별 build
-Docker build
-ECR login
-ECR push
+rollback:
+  values-prod.yaml image.tag를 이전 tag로 되돌림
+
+increase_memory:
+  values-prod.yaml resources.requests.memory / limits.memory 수정
+
+increase_hpa:
+  values-prod.yaml autoscaling.maxReplicas 수정
 ```
 
-결과:
+이 방식이 중요한 이유:
 
 ```text
-ECR repository에 새 image tag가 생긴다.
-예: 337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:<new-tag>
+kubectl로 직접 고치면 GitOps desired state와 EKS live state가 어긋난다.
+values를 Git에 commit하면 Argo CD가 Git 기준으로 동기화한다.
+그래서 변경 이력과 rollback 이력이 Git에 남는다.
 ```
 
-중요한 판단:
+---
 
-```text
-이 시점은 "이미지가 만들어진 것"이지 "서비스가 정상 배포된 것"이 아니다.
-```
+## 4. Argo CD 역할
 
-### Step 3. gympt-apps가 gympt-gitops values를 바꾼다
-
-대상 파일:
-
-```text
-../gympt-ops/gympt-gitops/charts/backend-api/values-prod.yaml
-```
-
-변경 대상:
-
-```yaml
-image:
-  tag: "<new-tag>"
-```
-
-의미:
-
-```text
-Kubernetes에 배포할 backend-api image tag를 Git으로 선언한다.
-Argo CD는 이 Git 상태를 desired state로 본다.
-```
-
-주의:
-
-```text
-cd-quality-gate는 정상 배포 시작 시 이 값을 직접 바꾸지 않는다.
-정상 배포의 values update는 기존 gympt-apps CI/CD 책임이다.
-```
-
-### Step 4. Argo CD가 gympt-gitops 변경을 감지한다
-
-Argo CD Application 기준 파일:
+Argo CD Application:
 
 ```text
 ../gympt-ops/gympt-gitops/argocd/applications/prod/backend-api.yaml
@@ -224,80 +337,338 @@ Argo CD Application 기준 파일:
 핵심 설정:
 
 ```text
-app: backend-api-prod
+Application name: backend-api-prod
 source repo: https://github.com/hj-3/gympt-gitops.git
+targetRevision: main
 path: charts/backend-api
 valueFiles: values-prod.yaml
 destination namespace: gympt-prod
+automated sync: enabled
+selfHeal: enabled
 ```
 
 Argo CD가 하는 일:
 
 ```text
-gympt-gitops main branch 변경 감지
-Helm chart 렌더링
-Kubernetes manifest 적용
-backend-api-prod Deployment update
-Pod rollout 진행
+1. gympt-gitops main branch 감시
+2. charts/backend-api Helm chart 읽기
+3. values-prod.yaml 적용
+4. Kubernetes manifest 생성
+5. EKS gympt-prod namespace에 적용
+6. backend-api-prod Deployment rollout
 ```
 
-중요한 판단:
+Argo CD가 필요한 이유:
 
 ```text
-Argo CD sync가 끝났다는 것은 Kubernetes desired state 반영이 끝났다는 뜻이다.
-하지만 서비스가 실제로 안정적인지는 아직 모른다.
+Git을 배포 기준으로 삼을 수 있다.
+누가 언제 어떤 image tag를 배포했는지 Git history로 추적할 수 있다.
+rollback도 Git commit으로 처리할 수 있다.
+EKS 상태가 Git과 달라지면 selfHeal로 되돌릴 수 있다.
 ```
 
-## 4. cd-quality-gate 시작 지점
+---
 
-`cd-quality-gate-architecture`는 기존 배포 앞단을 대체하지 않는다.
+## 5. cd-quality-gate 연결 방식
 
-시작 지점:
+`gympt-app` 배포가 끝난 뒤 cd-quality-gate를 실행하는 연결점은 GitHub Webhook이다.
+
+GitHub repo setting에서 추가할 webhook:
 
 ```text
-Argo CD sync 이후
-backend-api-prod rollout 이후
-post-deploy 검증 단계
+Repository: hj-3/gympt-app
+Payload URL: Terraform output github_webhook_url
+Content type: application/json
+Secret: AWS Secrets Manager에 저장한 GitHub webhook secret과 동일한 값
+Event: Workflow runs
 ```
 
-실행 workflow:
+Terraform output:
+
+```text
+github_webhook_url
+```
+
+Terraform이 만드는 파일:
+
+```text
+infra/terraform/apigateway.tf
+infra/terraform/lambda.tf
+infra/terraform/iam.tf
+infra/terraform/outputs.tf
+```
+
+Webhook을 받는 Lambda:
+
+```text
+lambda/github-webhook-handler/app.py
+```
+
+패키징:
+
+```text
+scripts/lambda/package-analysis-orchestrator.sh
+-> build/github-webhook-handler.zip 생성
+```
+
+---
+
+## 6. GitHub Webhook 상세 흐름
+
+### Step 6.1 gympt-app backend workflow 완료
+
+트리거:
+
+```text
+gympt-app backend-api-ci.yml workflow_run completed
+```
+
+GitHub가 보내는 payload 안에는 아래 정보가 있다.
+
+```text
+repository.full_name
+workflow_run.name
+workflow_run.conclusion
+workflow_run.head_branch
+workflow_run.run_number
+workflow_run.head_sha
+```
+
+### Step 6.2 API Gateway가 Webhook 수신
+
+실행 파일:
+
+```text
+infra/terraform/apigateway.tf
+```
+
+생성 리소스:
+
+```text
+aws_apigatewayv2_api.github_webhook
+aws_apigatewayv2_route.github_webhook
+aws_apigatewayv2_integration.github_webhook_handler
+aws_apigatewayv2_stage.github_webhook
+aws_lambda_permission.allow_apigateway_github_webhook
+```
+
+Endpoint:
+
+```text
+POST /github/webhooks
+```
+
+왜 API Gateway가 필요한가:
+
+```text
+GitHub Webhook은 인터넷에서 HTTPS endpoint로 요청을 보낸다.
+Lambda는 직접 public HTTP endpoint가 아니다.
+API Gateway가 public HTTPS endpoint 역할을 하고 Lambda로 요청을 넘긴다.
+```
+
+### Step 6.3 Lambda가 GitHub signature 검증
+
+실행 파일:
+
+```text
+lambda/github-webhook-handler/app.py
+```
+
+검증하는 header:
+
+```text
+X-GitHub-Event
+X-Hub-Signature-256
+```
+
+검증 방식:
+
+```text
+GitHub webhook secret + raw request body
+-> HMAC SHA256 계산
+-> X-Hub-Signature-256 값과 비교
+```
+
+왜 필요한가:
+
+```text
+API Gateway URL은 인터넷에 노출된다.
+signature 검증이 없으면 아무나 quality-gate workflow를 실행시킬 수 있다.
+그래서 webhook secret 검증은 필수다.
+```
+
+필요 secret:
+
+```text
+AWS Secrets Manager:
+  cd-quality-gate/github/webhook-secret
+```
+
+Terraform variable:
+
+```text
+github_webhook_secret_arn
+```
+
+### Step 6.4 Lambda가 workflow_run 조건 필터링
+
+`lambda/github-webhook-handler/app.py`가 확인하는 조건:
+
+```text
+X-GitHub-Event == workflow_run
+payload.action == completed
+repository.full_name == hj-3/gympt-app
+workflow_run.name == Backend API CI/CD
+workflow_run.head_branch == main
+workflow_run.conclusion == success
+workflow_run.event != pull_request
+```
+
+왜 필요한가:
+
+```text
+모든 workflow_run을 Quality Gate로 보내면 안 된다.
+pull_request, 실패한 workflow, dev branch, 다른 workflow는 제외해야 한다.
+운영 backend-api main 배포 성공 케이스만 Quality Gate를 실행해야 한다.
+```
+
+### Step 6.5 Lambda가 image tag 계산
+
+gympt-app workflow image tag 규칙:
+
+```text
+${github.run_number}-${GITHUB_SHA:0:7}
+```
+
+Webhook Lambda 계산:
+
+```text
+workflow_run.run_number + "-" + workflow_run.head_sha[:7]
+```
+
+최종 image:
+
+```text
+337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:<tag>
+```
+
+예:
+
+```text
+337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:115-5c35fc1
+```
+
+### Step 6.6 Lambda가 cd-quality-gate workflow_dispatch 실행
+
+dispatch 대상:
+
+```text
+repo: seungwankim364/g2mpt-cicd-ai-agent
+workflow: quality-gate.yml
+ref: main
+```
+
+실행 파일:
+
+```text
+lambda/github-webhook-handler/app.py
+```
+
+필요 secret:
+
+```text
+AWS Secrets Manager:
+  cd-quality-gate/github/dispatch-token
+```
+
+왜 dispatch token이 필요한가:
+
+```text
+Lambda가 GitHub API를 호출해서 cd-quality-gate repo의 workflow를 실행해야 한다.
+GitHub API workflow_dispatch 호출에는 권한이 있는 token이 필요하다.
+```
+
+전달하는 inputs:
+
+```text
+service=backend-api
+environment=prod
+namespace=gympt-prod
+deployment=backend-api-prod
+image_tag=<ECR image URI>
+```
+
+---
+
+## 7. Quality Gate workflow 상세 흐름
+
+실행 파일:
 
 ```text
 .github/workflows/quality-gate.yml
 ```
 
-선택 wrapper:
+왜 이 workflow가 필요한가:
 
 ```text
-.github/workflows/cd.yml
+Argo CD sync 또는 GitHub Actions 성공만으로는 서비스가 건강한지 알 수 없다.
+Kubernetes rollout과 Prometheus alert를 같이 봐야 배포 안정성을 판단할 수 있다.
 ```
 
-`quality-gate.yml` 입력:
-
-```text
-service: backend-api
-environment: prod
-namespace: gympt-prod
-deployment: backend-api-prod
-image_tag: 배포된 image tag
-```
-
-실행 runner:
+runner:
 
 ```text
 self-hosted, linux, eks
 ```
 
-이 runner가 필요한 이유:
+왜 self-hosted runner가 필요한가:
 
 ```text
-EKS 내부 Kubernetes rollout 확인 필요
-internal Prometheus service 접근 필요
+Prometheus URL이 EKS 내부 주소다.
+kubectl rollout 확인도 EKS 접근 권한이 필요하다.
+GitHub-hosted runner는 내부 Kubernetes service 주소를 볼 수 없다.
 ```
 
-## 5. Quality Gate 상세 실행
+### Step 7.1 cd-quality-gate repo checkout
 
-### Step 5.1 Kubernetes rollout 확인
+실행:
+
+```yaml
+actions/checkout@v4
+repository: seungwankim364/g2mpt-cicd-ai-agent
+ref: main
+```
+
+왜 명시 checkout이 필요한가:
+
+```text
+workflow_call 또는 외부 dispatch 환경에서 caller repo가 checkout될 수 있다.
+Quality Gate script는 cd-quality-gate repo 안에 있다.
+그래서 repository를 명시해서 scripts/quality-gate/* 경로를 보장한다.
+```
+
+### Step 7.2 AWS credentials 설정
+
+실행:
+
+```text
+aws-actions/configure-aws-credentials@v4
+```
+
+사용 secret:
+
+```text
+AWS_ROLE_ARN
+```
+
+왜 필요한가:
+
+```text
+Quality Gate 실패 시 EventBridge에 DeploymentFailed event를 발행해야 한다.
+그 작업에는 events:PutEvents 권한이 필요하다.
+```
+
+### Step 7.3 Kubernetes rollout 확인
 
 실행 파일:
 
@@ -310,44 +681,54 @@ scripts/cd/check-k8s-rollout.sh
 ```text
 K8S_NAMESPACE=gympt-prod
 K8S_DEPLOYMENT=backend-api-prod
+EXPECTED_IMAGE=337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:<이번 배포 tag>
 ```
 
 하는 일:
 
 ```text
-kubectl rollout status deployment/backend-api-prod -n gympt-prod
+1. backend-api-prod Deployment의 container image가 EXPECTED_IMAGE와 같아질 때까지 대기
+2. kubectl rollout status deployment/backend-api-prod -n gympt-prod
+3. kubectl get deploy backend-api-prod -n gympt-prod
+4. kubectl get pods -l app=backend-api-prod -n gympt-prod
 ```
 
-판단:
+왜 image tag 확인을 먼저 하는가:
 
 ```text
-rollout 실패:
-  Quality Gate 실패로 이어짐
+gympt-app workflow가 성공했다는 것은 ECR push와 gympt-gitops values commit/push가 끝났다는 뜻이다.
+하지만 Argo CD가 그 Git 변경을 EKS에 반영하는 데는 약간의 시간이 걸릴 수 있다.
 
-rollout 성공:
-  Prometheus 5분 health check로 넘어감
+이때 곧바로 kubectl rollout status만 실행하면,
+아직 새 image가 적용되지 않은 이전 Deployment 상태를 보고 성공으로 판단할 수 있다.
+
+그래서 Quality Gate는 먼저 Deployment spec의 container image가 이번 배포 image tag와 같아졌는지 확인한다.
+그 다음에 rollout status를 본다.
+이 순서가 있어야 "이전 배포가 건강한지"가 아니라 "이번 배포가 건강한지"를 검증할 수 있다.
 ```
 
-### Step 5.2 5분 Health Check Window 실행
+실제 명령 기준:
+
+```text
+kubectl get deploy backend-api-prod -n gympt-prod -o jsonpath=...
+kubectl rollout status deployment/backend-api-prod -n gympt-prod
+kubectl get deploy backend-api-prod -n gympt-prod
+kubectl get pods -l app=backend-api-prod -n gympt-prod
+```
+
+왜 먼저 rollout을 확인하는가:
+
+```text
+pod가 아직 뜨지 않았는데 Prometheus alert만 보면 원인을 잘못 판단할 수 있다.
+먼저 Kubernetes가 이번 image tag로 새 Deployment를 정상 rollout했는지 확인해야 한다.
+```
+
+### Step 7.4 5분 Health Check Window
 
 실행 파일:
 
 ```text
 scripts/quality-gate/run-health-check-window.sh
-```
-
-기본 설정:
-
-```text
-HEALTH_CHECK_WINDOW_SECONDS=300
-HEALTH_CHECK_INTERVAL_SECONDS=60
-```
-
-의미:
-
-```text
-배포 직후 5분 동안 60초 간격으로 alert/metric을 반복 조회한다.
-한 번만 보고 판단하지 않고, 배포 직후 안정성을 window로 본다.
 ```
 
 내부에서 실행하는 파일:
@@ -358,82 +739,22 @@ scripts/quality-gate/query-prometheus-metrics.sh
 scripts/quality-gate/evaluate-quality-gate.py
 ```
 
-결과 파일:
+설정:
 
 ```text
-prometheus-alerts-*.json
-prometheus-metrics-*.json
-quality-gate-result-*.json
-quality-gate-window-result.json
-quality-gate-result.json
+HEALTH_CHECK_WINDOW_SECONDS=300
+HEALTH_CHECK_INTERVAL_SECONDS=60
 ```
 
-### Step 5.3 Prometheus alert 조회
-
-실행 파일:
+왜 5분을 보는가:
 
 ```text
-scripts/quality-gate/query-prometheus-alerts.sh
+배포 직후에는 pod warm-up, connection 재생성, cache miss 때문에 일시적 흔들림이 있을 수 있다.
+한 번만 보고 실패 처리하면 오탐이 생길 수 있다.
+반대로 5분 동안 반복해서 firing alert가 보이면 배포 영향 가능성이 더 높다.
 ```
 
-조회 대상:
-
-```text
-PROMETHEUS_URL
-```
-
-현재 기준:
-
-```text
-http://kube-prometheus-stack-prometheus.monitoring.svc:9090
-```
-
-조회하는 API:
-
-```text
-/api/v1/alerts
-```
-
-평가 namespace:
-
-```text
-gympt-prod
-monitoring
-posture-analysis
-elasticache
-```
-
-### Step 5.4 Prometheus metric 조회
-
-실행 파일:
-
-```text
-scripts/quality-gate/query-prometheus-metrics.sh
-```
-
-역할:
-
-```text
-배포 직후 metric snapshot을 남긴다.
-Slack/Athena/AI 분석에서 참고할 수 있는 배포 직후 상태를 보존한다.
-```
-
-### Step 5.5 Quality Gate 판단
-
-실행 파일:
-
-```text
-scripts/quality-gate/evaluate-quality-gate.py
-```
-
-판단 기준:
-
-```text
-firing alert 중에서
-service/namespace/alert name이 현재 배포 대상과 연결되면 실패
-```
-
-현재 평가 alert:
+평가 alert:
 
 ```text
 BackendHighErrorRate
@@ -455,77 +776,56 @@ BedrockHighErrorRate
 BedrockThrottling
 ```
 
-판단 결과:
+이 alert들은 `gympt-gitops/platform/monitoring`의 PrometheusRule과 dashboard 기준을 참고해서 확장했다.
 
-```text
-pass:
-  Slack 배포 완료 알림
+### Step 7.5 성공 시 Slack 완료 알림
 
-fail:
-  Slack 1차 실패 알림
-  EventBridge DeploymentFailed 발행
-  AI 분석으로 이동
-```
-
-## 6. Quality Gate 성공 흐름
-
-성공 시 실행 파일:
+실행 파일:
 
 ```text
 scripts/quality-gate/send-slack-deploy-success.py
 ```
 
-Slack channel:
+의미:
 
 ```text
-#cd-deploy-alarm
+GitHub Actions 성공
+Argo CD 반영
+Kubernetes rollout 성공
+Prometheus 5분 health check 성공
 ```
 
-메시지 의미:
+즉, 단순히 이미지가 올라간 것이 아니라 배포 후 안정성까지 통과했다는 뜻이다.
 
-```text
-배포가 Kubernetes rollout만 통과한 것이 아니라
-Prometheus 기준 5분 health check까지 통과했다는 뜻이다.
-```
-
-여기서 정상 배포 흐름은 종료된다.
-
-## 7. Quality Gate 실패 흐름
-
-실패 시 먼저 Grafana/Prometheus/Argo CD 링크를 만든다.
+### Step 7.6 실패 시 Slack 1차 알림
 
 실행 파일:
 
 ```text
 scripts/quality-gate/build-grafana-links.py
-```
-
-Slack 1차 실패 알림:
-
-```text
 scripts/quality-gate/send-slack-first-alert.py
 ```
 
-Slack 1차 알림에 들어가는 것:
+Slack 1차 알림에 포함되는 것:
 
 ```text
 service
-environment
 namespace
-deployment
-image tag
 firing alerts
-Grafana dashboard links
-Prometheus link
+Grafana dashboard link
+Prometheus alert link
 Argo CD app link
 GitHub Actions run link
 ```
 
-이 알림은 "배포 실패를 빠르게 알리는 1차 알림"이다.
+왜 1차 알림이 필요한가:
 
-아직 AI 분석이 끝난 것은 아니다.
+```text
+AI 분석은 Lambda/Athena/Bedrock 과정을 거치므로 시간이 더 걸릴 수 있다.
+운영자는 먼저 "배포가 실패했다"는 사실과 dashboard 링크를 빨리 받아야 한다.
+```
 
-## 8. EventBridge로 실패 이벤트 발행
+### Step 7.7 EventBridge DeploymentFailed 발행
 
 실행 파일:
 
@@ -536,147 +836,133 @@ scripts/quality-gate/publish-eventbridge-event.sh
 발행 대상:
 
 ```text
-EventBridge bus: cd-quality-gate-prod-bus
-detail-type: DeploymentFailed
+event bus: cd-quality-gate-prod-bus
 source: cd.quality-gate
+detail-type: DeploymentFailed
 ```
 
-필요 권한:
+왜 EventBridge를 쓰는가:
 
 ```text
-GitHub Actions OIDC 또는 AWS credential
-events:PutEvents
+GitHub Actions에서 AI 분석을 직접 길게 실행하지 않는다.
+실패 이벤트를 AWS EventBridge로 넘기면 Lambda가 비동기로 분석을 이어갈 수 있다.
+GitHub Actions, Slack, Lambda 책임을 분리할 수 있다.
 ```
 
-이 이벤트가 AI 분석 Lambda를 시작한다.
+---
 
-## 9. Lambda Orchestrator 상세 흐름
+## 8. AI 분석 흐름
 
-트리거:
-
-```text
-EventBridge DeploymentFailed
-```
-
-실행 파일:
-
-```text
-lambda/analysis-orchestrator/app.py
-```
-
-Terraform 연결:
+EventBridge rule:
 
 ```text
 infra/terraform/eventbridge.tf
-infra/terraform/lambda.tf
-infra/terraform/iam.tf
-```
-
-Orchestrator가 하는 일:
-
-```text
-1. DeploymentFailed event detail 읽기
-2. service/environment/deployment/imageTag/alerts 추출
-3. Athena query template 선택
-4. Athena query 실행
-5. Athena summary 생성 또는 fallback summary 생성
-6. Bedrock AI 분석 호출
-7. Bedrock 실패 시 local ai-agent fallback
-8. Slack 2차 분석/승인 메시지 생성
-9. Slack #cd-deploy-alarm에 전송
-10. S3 result bucket에 분석 결과 저장
-```
-
-Athena template:
-
-```text
-athena/templates/backend-api.json
-```
-
-Athena query:
-
-```text
-athena/queries/alb-5xx-errors.sql
-athena/queries/api-latency-top-paths.sql
-athena/queries/application-error-patterns.sql
-athena/queries/cloudfront-5xx-errors.sql
-athena/queries/waf-blocked-requests.sql
-```
-
-Bedrock adapter:
-
-```text
-lambda/analysis-orchestrator/bedrock_agent.py
-```
-
-Fallback AI:
-
-```text
-ai-agent/app/analyzer.py
-ai-agent/app/slack_message_builder.py
-```
-
-## 10. Slack 2차 분석/승인 흐름
-
-Slack 2차 알림은 단순 실패 알림이 아니다.
-
-포함 내용:
-
-```text
-AI 분석 요약
-가능한 원인 후보
-alert evidence
-Athena log evidence
-추천 조치
-rollback / change / manual fix 승인 버튼
-```
-
-승인 버튼을 누르면 Slack Interactivity가 API Gateway로 요청을 보낸다.
-
-API Gateway:
-
-```text
-POST /slack/interactions
-```
-
-Terraform 파일:
-
-```text
-infra/terraform/apigateway.tf
 ```
 
 Lambda:
 
 ```text
+lambda/analysis-orchestrator/app.py
+```
+
+패키징:
+
+```text
+build/analysis-orchestrator.zip
+```
+
+하는 일:
+
+```text
+1. DeploymentFailed event 수신
+2. alert와 deployment metadata 정리
+3. Athena query 실행
+4. S3 result bucket에 summary 저장
+5. Bedrock으로 장애 원인 분석
+6. Bedrock 실패 시 local ai-agent fallback
+7. Slack 2차 분석/승인 메시지 전송
+```
+
+Bedrock이 필요한 이유:
+
+```text
+Prometheus alert만 보면 "무슨 문제가 발생했는지"는 알 수 있지만,
+"rollback이 좋은지", "메모리를 늘릴지", "issue를 열어야 하는지" 판단은 더 어렵다.
+Bedrock은 alert, Athena summary, runbook 정보를 같이 보고 원인 후보와 추천 조치를 만든다.
+```
+
+fallback이 필요한 이유:
+
+```text
+Bedrock 권한, quota, model 오류가 나도 Slack 분석 흐름이 완전히 멈추면 안 된다.
+그래서 local rule-based ai-agent가 대체 분석을 수행한다.
+```
+
+---
+
+## 9. Slack 승인 흐름
+
+Slack 2차 알림에는 승인 버튼이 있다.
+
+지원 action:
+
+```text
+rollback
+restart_deployment
+scale_replicas
+increase_memory
+increase_hpa
+open_fix_issue
+open_change_pr
+```
+
+`observe`는 승인 버튼을 만들지 않는다.
+
+Slack interactivity endpoint:
+
+```text
+POST /slack/interactions
+```
+
+Terraform output:
+
+```text
+slack_interactivity_url
+```
+
+실행 파일:
+
+```text
 lambda/slack-approval-handler/app.py
 ```
 
-Slack approval handler가 하는 일:
+하는 일:
 
 ```text
 1. Slack signature 검증
 2. button payload 파싱
-3. action type 확인
-4. DeploymentActionApproved event 생성
-5. EventBridge cd-quality-gate-prod-bus로 발행
+3. DeploymentActionApproved event 생성
+4. EventBridge cd-quality-gate-prod-bus로 발행
 ```
 
-필요 secret:
+왜 Slack signature 검증이 필요한가:
 
 ```text
-AWS Secrets Manager:
-cd-quality-gate/slack/signing-secret
+승인 버튼은 운영 조치를 실행한다.
+요청이 진짜 Slack에서 온 것인지 검증해야 한다.
 ```
 
-## 11. 승인 이후 action executor
+---
 
-트리거:
+## 10. 승인 후 자동 실행
+
+EventBridge rule:
 
 ```text
-EventBridge DeploymentActionApproved
+DeploymentActionApproved
 ```
 
-실행 파일:
+Lambda:
 
 ```text
 lambda/deployment-action-executor/app.py
@@ -685,178 +971,186 @@ lambda/deployment-action-executor/app.py
 역할:
 
 ```text
-승인된 action type을 보고 GitHub workflow를 dispatch한다.
+승인된 action type을 보고 GitHub workflow_dispatch를 실행한다.
 ```
 
-현재 action mapping:
+mapping:
 
 ```text
 rollback:
-  repo: seungwankim364/g2mpt-cicd-ai-agent
-  workflow: rollback.yml
+  .github/workflows/rollback.yml
 
-manual_fix:
-  repo: seungwankim364/g2mpt-cicd-ai-agent
-  workflow: manual-fix.yml
+manual_fix / open_fix_issue:
+  .github/workflows/manual-fix.yml
 
-change:
-  repo: seungwankim364/g2mpt-cicd-ai-agent
-  workflow: change-apply.yml
+change / restart_deployment / scale_replicas / increase_memory / increase_hpa / open_change_pr:
+  .github/workflows/change-apply.yml
 ```
 
-GitHub token 위치:
+필요 secret:
 
 ```text
 AWS Secrets Manager:
-cd-quality-gate/github/dispatch-token
+  cd-quality-gate/github/dispatch-token
 ```
 
-중요:
+---
 
-```text
-이 token은 cd-quality-gate repo workflow_dispatch 권한이 필요하다.
-```
+## 11. Rollback 흐름
 
-현재 Lambda는 SecretString이 JSON이어도 token 값을 추출할 수 있다.
-
-지원하는 secret 형태:
-
-```json
-{
-  "cd-quality-gate/github/dispatch-token": "ghp_..."
-}
-```
-
-## 12. Rollback 상세 흐름
-
-rollback 승인 시 실행되는 파일:
+실행 파일:
 
 ```text
 .github/workflows/rollback.yml
-```
-
-이 workflow는 `gympt-apps`를 다시 빌드하지 않는다.
-
-이유:
-
-```text
-rollback은 새 이미지를 만드는 것이 아니라
-이미 존재하는 이전 image tag로 GitOps desired state를 되돌리는 작업이다.
-```
-
-실행 순서:
-
-```text
-1. rollback approval input 검증
-2. target_image_tag 존재 확인
-3. GH_WORKFLOW_DISPATCH_TOKEN 확인
-4. rollback-request.json artifact 작성
-5. scripts/cd/update-gitops-image-tag.sh 실행
-6. hj-3/gympt-gitops clone
-7. charts/backend-api/values-prod.yaml image.tag 수정
-8. rollback commit 생성
-9. gympt-gitops main에 push
-10. Argo CD가 GitOps 변경 감지
-11. backend-api-prod가 이전 image tag로 sync
-```
-
-실행 스크립트:
-
-```text
 scripts/cd/update-gitops-image-tag.sh
 ```
 
-필요 GitHub Secret:
+순서:
 
 ```text
-GH_WORKFLOW_DISPATCH_TOKEN
+1. Slack에서 rollback 승인
+2. Slack approval Lambda가 DeploymentActionApproved 발행
+3. deployment-action-executor Lambda가 rollback.yml dispatch
+4. rollback.yml이 target_image_tag 확인
+5. scripts/cd/update-gitops-image-tag.sh 실행
+6. hj-3/gympt-gitops clone
+7. charts/backend-api/values-prod.yaml image.tag를 이전 tag로 수정
+8. gympt-gitops main에 commit/push
+9. Argo CD가 변경 감지
+10. backend-api-prod가 이전 image tag로 sync
 ```
 
-필요 권한:
+왜 gympt-app을 다시 빌드하지 않는가:
 
 ```text
-hj-3/gympt-gitops contents read/write
+rollback은 새 이미지를 만드는 작업이 아니다.
+이미 ECR에 존재하는 이전 image tag로 desired state를 되돌리는 작업이다.
 ```
 
-주의:
+---
 
-```text
-AWS Secrets Manager의 dispatch token과 GitHub Secret GH_WORKFLOW_DISPATCH_TOKEN은 역할이 다르다.
+## 12. Fix/Change 흐름
 
-AWS Secrets Manager token:
-  Lambda가 cd-quality-gate rollback.yml을 실행하기 위한 token
-
-GitHub Secret GH_WORKFLOW_DISPATCH_TOKEN:
-  rollback.yml이 gympt-gitops values-prod.yaml을 commit/push하기 위한 token
-```
-
-## 13. manual fix/change 흐름
-
-이제 `manual_fix/change`는 큰 버튼 하나가 아니라 실행 가능한 runbook action으로 쪼갠다.
-
-```text
-restart_deployment
-  -> GitOps values podAnnotations.cd-quality-gate/restartedAt 갱신
-  -> Argo CD sync
-  -> pod template 변경으로 rollout restart 유도
-
-scale_replicas
-  -> GitOps values autoscaling.minReplicas=2 갱신
-  -> Argo CD sync
-  -> 최소 pod 수 증가
-
-increase_memory
-  -> GitOps values resources.requests.memory=2Gi
-  -> GitOps values resources.limits.memory=3Gi
-  -> Argo CD sync
-  -> 메모리 여유 증가
-
-increase_hpa
-  -> GitOps values autoscaling.maxReplicas=30 갱신
-  -> Argo CD sync
-  -> HPA 상한 증가
-
-open_fix_issue
-  -> manual-fix.yml
-  -> GitHub issue/artifact 생성
-  -> gympt-app fix PR로 연결
-
-open_change_pr
-  -> change-apply.yml
-  -> GitHub issue/artifact 생성
-  -> GitOps/Terraform/app PR 중 하나로 연결
-```
-
-manual fix:
+실행 파일:
 
 ```text
 .github/workflows/manual-fix.yml
-```
-
-현재 상태:
-
-```text
-manual_fix 또는 open_fix_issue action을 받는다.
-승인 기록, artifact, GitHub issue를 생성한다.
-코드 수정이 필요한 경우 gympt-app fix PR을 만들고
-기존 gympt-app -> gympt-gitops -> Argo CD -> Quality Gate 흐름을 다시 탄다.
-```
-
-change:
-
-```text
 .github/workflows/change-apply.yml
+scripts/cd/update-gitops-yaml-value.sh
 ```
 
-현재 상태:
+자동 GitOps patch action:
 
 ```text
-change-apply.yml이 아래 action을 직접 처리한다.
-restart_deployment, scale_replicas, increase_memory, increase_hpa는 GitOps values를 자동 patch한다.
-change/open_change_pr은 승인 기록과 issue/artifact를 만든다.
+restart_deployment:
+  podAnnotations.cd-quality-gate/restartedAt 갱신
+
+scale_replicas:
+  autoscaling.minReplicas=2
+
+increase_memory:
+  resources.requests.memory=2Gi
+  resources.limits.memory=3Gi
+
+increase_hpa:
+  autoscaling.maxReplicas=30
 ```
 
-## 14. Terraform이 만드는 AWS 연결
+issue/action record action:
+
+```text
+open_fix_issue:
+  manual-fix.yml이 issue/artifact 생성
+
+open_change_pr:
+  change-apply.yml이 issue/artifact 생성
+```
+
+왜 모든 fix를 자동 코드 수정하지 않는가:
+
+```text
+코드 버그, DB schema, 외부 dependency 문제는 자동으로 고치기 어렵다.
+대신 AI가 원인과 증거를 정리하고 issue/change record를 남긴다.
+운영자가 fix PR을 만들면 기존 gympt-app -> gympt-gitops -> Argo CD -> Quality Gate 흐름을 다시 탄다.
+```
+
+---
+
+## 13. Dashboard 흐름
+
+Dashboard는 운영자가 현재 CD 상태를 보는 화면이다.
+
+Frontend:
+
+```text
+dashboard/index.html
+dashboard/src/main.js
+dashboard/src/data/loadDashboardData.js
+dashboard/src/styles.css
+```
+
+Local backend:
+
+```text
+dashboard/server.mjs
+```
+
+AWS backend:
+
+```text
+lambda/dashboard-api/app.py
+```
+
+Terraform:
+
+```text
+infra/terraform/dashboard.tf
+```
+
+기본값:
+
+```text
+enable_dashboard=false
+```
+
+왜 기본값이 false인가:
+
+```text
+CloudFront, S3, API Gateway, Lambda, DynamoDB가 추가로 생성된다.
+비용 관리를 위해 Slack 운영 검증 전에는 dashboard stack을 끈 상태로 둔다.
+```
+
+Dashboard를 AWS에 올릴 때:
+
+```bash
+terraform -chdir=infra/terraform plan -var='enable_dashboard=true'
+```
+
+Dashboard가 보여주는 것:
+
+```text
+deployment summary
+timeline
+health window result
+alert groups
+AI analysis summary
+approval/action history
+Terraform resource status
+Grafana/Prometheus/Argo CD/GitHub Actions/Slack links
+```
+
+현재 한계:
+
+```text
+GitHub Actions job 실패 상세를 GitHub API로 직접 조회하지는 않는다.
+Prometheus metric을 dashboard API가 직접 query하지는 않는다.
+Argo CD API를 직접 query하지는 않는다.
+대신 Quality Gate 산출물, S3 summary, link 기반으로 운영자가 빠르게 이동할 수 있게 한다.
+```
+
+---
+
+## 14. Terraform 리소스
 
 Terraform root:
 
@@ -864,128 +1158,143 @@ Terraform root:
 infra/terraform
 ```
 
-현재 plan 결과:
+기본 생성 리소스:
 
 ```text
-Plan: 28 to add, 0 to change, 0 to destroy
-```
-
-생성 대상:
-
-```text
-API Gateway Slack interactivity endpoint
+GitHub webhook API Gateway
+GitHub webhook Lambda
+Slack approval API Gateway
+Slack approval Lambda
 EventBridge bus/rules/targets
-Lambda analysis-orchestrator
-Lambda slack-approval-handler
-Lambda deployment-action-executor
+analysis-orchestrator Lambda
+deployment-action-executor Lambda
 IAM roles/policies
 S3 result bucket
 Athena database/workgroup
-Secrets Manager slack webhook secret resource
+```
+
+Dashboard 활성화 시 추가:
+
+```text
+S3 dashboard bucket
+CloudFront distribution
+Dashboard API Gateway
+Dashboard Lambda
+DynamoDB action table
+S3 objects for dashboard frontend
 ```
 
 중요 output:
 
 ```text
+github_webhook_url
+slack_interactivity_url
 event_bus_name
-lambda_function_name
 result_bucket_name
 athena_database_name
 athena_workgroup_name
-slack_interactivity_url
+dashboard_cloudfront_url
+dashboard_api_url
 ```
 
-`slack_interactivity_url`은 apply 이후에만 확정된다.
+AWS CLI login을 Terraform에서 쓸 때:
 
-## 15. 전체 흐름 한 장 요약
-
-```text
-gympt-apps
-  push/merge
-  -> build/test
-  -> Docker build
-  -> ECR push
-  -> gympt-gitops values-prod.yaml image.tag update
-
-gympt-gitops
-  values-prod.yaml changed
-  -> Argo CD detects change
-  -> Helm render
-  -> EKS gympt-prod/backend-api-prod sync
-
-cd-quality-gate-architecture
-  quality-gate.yml
-  -> check-k8s-rollout.sh
-  -> run-health-check-window.sh
-  -> query-prometheus-alerts.sh
-  -> query-prometheus-metrics.sh
-  -> evaluate-quality-gate.py
-
-if pass
-  -> send-slack-deploy-success.py
-  -> Slack #cd-deploy-alarm deploy complete
-
-if fail
-  -> build-grafana-links.py
-  -> send-slack-first-alert.py
-  -> publish-eventbridge-event.sh
-  -> EventBridge DeploymentFailed
-  -> analysis-orchestrator Lambda
-  -> Athena + Bedrock/local ai-agent
-  -> Slack #cd-deploy-alarm second analysis alert
-  -> Slack approval button
-  -> API Gateway /slack/interactions
-  -> slack-approval-handler Lambda
-  -> EventBridge DeploymentActionApproved
-  -> deployment-action-executor Lambda
-  -> rollback.yml / manual-fix.yml / change-apply.yml
-
-rollback path
-  -> rollback.yml
-  -> update-gitops-image-tag.sh
-  -> gympt-gitops values-prod.yaml image.tag rollback commit
-  -> Argo CD sync
-  -> backend-api-prod rollback deployment
+```bash
+eval "$(aws configure export-credentials --profile ksw2 --format env)"
+terraform -chdir=infra/terraform plan
 ```
 
-## 16. 사용자가 흐름을 확인할 때 읽는 순서
+---
 
-처음부터 끝까지 이해하려면 아래 순서로 보면 된다.
+## 15. Secret 목록
+
+GitHub repo secret:
 
 ```text
-1. README.md
-2. docs/20-implementation/31-gympt-app-to-gitops-to-quality-gate-flow.md
-3. docs/20-implementation/26-runtime-file-role-and-architecture-flow.md
-4. docs/20-implementation/27-github-secrets-and-runtime-values.md
-5. docs/20-implementation/25-rollback-workflow-design.md
-6. docs/20-implementation/28-pre-apply-verification-checklist.md
-7. docs/20-implementation/30-final-status-and-user-checklist.md
+PROMETHEUS_URL
+SLACK_WEBHOOK_URL
+AWS_ROLE_ARN
+GH_WORKFLOW_DISPATCH_TOKEN
 ```
 
-## 17. 현재 남은 live 검증
-
-서비스가 다시 올라와야 확인 가능한 것:
+AWS Secrets Manager:
 
 ```text
-EKS node/self-hosted runner 복구
-Prometheus 실제 조회
-quality-gate.yml 5분 health check live 실행
-Slack 1차/2차 알림 실제 수신
-Slack approval button 실제 클릭
-deployment-action-executor Lambda dispatch
-rollback.yml이 gympt-gitops values-prod.yaml 실제 rollback commit 생성
-Argo CD rollback sync
-최종 배포 완료 알림
+cd-quality-gate/github/dispatch-token
+cd-quality-gate/github/webhook-secret
+cd-quality-gate/slack/signing-secret
+cd-quality-gate-prod/slack/webhook-url
 ```
 
-apply 전에 이미 확인된 것:
+각 secret 역할:
 
 ```text
-Lambda zip 생성
-terraform fmt
-terraform validate
-terraform plan
-GitHub token 권한
-rollback workflow YAML
-local fixture test
+dispatch-token:
+  Lambda가 GitHub workflow_dispatch API를 호출할 때 사용
+
+webhook-secret:
+  GitHub webhook 요청의 HMAC signature 검증
+
+slack/signing-secret:
+  Slack interactive button 요청 검증
+
+slack/webhook-url:
+  Lambda가 Slack 2차 분석 알림을 보낼 때 사용
+```
+
+---
+
+## 16. 최종 전체 흐름
+
+```text
+1. Developer가 gympt-app backend-api 코드 push
+2. gympt-app backend-api-ci.yml 실행
+3. Docker image build
+4. ECR push
+5. gympt-gitops values-prod.yaml image.tag 수정
+6. gympt-gitops main commit/push
+7. gympt-app backend-api-ci.yml workflow completed
+8. GitHub workflow_run completed webhook 발생
+9. API Gateway /github/webhooks 수신
+10. github-webhook-handler Lambda signature 검증
+11. repo/workflow/branch/conclusion 필터링
+12. quality-gate.yml workflow_dispatch
+13. self-hosted runner에서 backend-api-prod image tag가 이번 배포 image로 바뀔 때까지 대기
+14. Argo CD가 gympt-gitops 변경을 감지하고 backend-api-prod sync
+15. self-hosted runner에서 Kubernetes rollout 확인
+16. Prometheus 5분 health check
+17. 성공이면 Slack 배포 완료 알림
+18. 실패면 Slack 1차 실패 알림
+19. EventBridge DeploymentFailed 발행
+20. analysis-orchestrator Lambda 실행
+21. Athena + Bedrock/local ai-agent 분석
+22. Slack 2차 분석/승인 알림
+23. 운영자가 rollback/fix/change 승인
+24. Slack approval Lambda가 DeploymentActionApproved 발행
+25. deployment-action-executor Lambda가 GitHub workflow dispatch
+26. rollback/change/manual-fix workflow 실행
+27. GitOps 변경이 있으면 Argo CD sync
+28. 다시 Quality Gate 검증 흐름으로 이어짐
+```
+
+---
+
+## 17. 서비스 올린 뒤 live 검증 순서
+
+```text
+1. Terraform apply
+2. output github_webhook_url 확인
+3. hj-3/gympt-app repository settings에 webhook 추가
+4. webhook secret을 AWS Secrets Manager 값과 동일하게 입력
+5. Event는 Workflow runs 선택
+6. backend-api main 배포 실행
+7. GitHub webhook delivery 2xx 확인
+8. cd-quality-gate quality-gate.yml workflow 실행 확인
+9. self-hosted runner에서 rollout 확인
+10. Prometheus 5분 health check 확인
+11. Slack #cd-deploy-alarm 완료 또는 실패 알림 확인
+12. 실패 케이스에서 Bedrock 분석 Slack 2차 알림 확인
+13. 승인 버튼 클릭
+14. rollback/change/manual-fix workflow dispatch 확인
+15. GitOps commit 또는 issue/artifact 생성 확인
 ```

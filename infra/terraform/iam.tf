@@ -170,3 +170,51 @@ resource "aws_iam_role_policy" "deployment_action_executor" {
     ]
   })
 }
+
+resource "aws_iam_role" "github_webhook_handler" {
+  name = "${local.name_prefix}-github-webhook-handler"
+  tags = local.tags
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "github_webhook_handler" {
+  name = "${local.name_prefix}-github-webhook-handler"
+  role = aws_iam_role.github_webhook_handler.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = compact([
+          var.github_token_secret_arn,
+          var.github_webhook_secret_arn
+        ])
+      }
+    ]
+  })
+}
