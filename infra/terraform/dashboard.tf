@@ -258,6 +258,7 @@ resource "aws_lambda_function" "dashboard_api" {
   handler                        = "app.handler"
   runtime                        = "python3.12"
   filename                       = "${path.module}/../../build/dashboard-api.zip"
+  source_code_hash               = filebase64sha256("${path.module}/../../build/dashboard-api.zip")
   timeout                        = 15
   memory_size                    = 256
   reserved_concurrent_executions = 2

@@ -166,8 +166,8 @@ schemas/eventbridge/deployment-action-approved.schema.json
 
 ```text
 [x] terraform -chdir=infra/terraform validate 통과
-[x] terraform -chdir=infra/terraform plan 통과
-[x] terraform -chdir=infra/terraform plan -var='enable_dashboard=true' 통과
+[x] terraform -chdir=infra/terraform plan -var='environment=prod' 통과
+[x] terraform -chdir=infra/terraform plan -var='environment=prod' -var='enable_dashboard=true' 통과
 [x] 기본 plan: 35 to add, 0 to change, 0 to destroy
 [x] dashboard 포함 plan: 56 to add, 0 to change, 0 to destroy
 ```
@@ -454,11 +454,11 @@ change/manual_fix는 승인 후 요청 기록, artifact, GitHub issue 생성까�
    command: aws login
 
 6. [x] Terraform plan 확인
-   command: terraform -chdir=infra/terraform plan
+   command: terraform -chdir=infra/terraform plan -var='environment=prod'
    result: 35 to add, 0 to change, 0 to destroy
 
 7. [x] Dashboard 포함 Terraform plan 확인
-   command: terraform -chdir=infra/terraform plan -var='enable_dashboard=true'
+   command: terraform -chdir=infra/terraform plan -var='environment=prod' -var='enable_dashboard=true'
    result: 56 to add, 0 to change, 0 to destroy
 
 8. [x] plan 결과에서 생성 대상 확인
@@ -484,10 +484,10 @@ apply 직전에는 일반 plan을 다시 확인하거나 `terraform plan -out=tf
 [ ] scripts/lambda/package-analysis-orchestrator.sh 실행
 [ ] terraform -chdir=infra/terraform init 실행
 [ ] terraform -chdir=infra/terraform validate 실행
-[ ] terraform -chdir=infra/terraform plan 실행
-[ ] dashboard까지 테스트할 경우 terraform -chdir=infra/terraform plan -var='enable_dashboard=true' 실행
-[ ] saved plan을 쓸 경우 terraform -chdir=infra/terraform plan -out=tfplan 실행
-[ ] terraform -chdir=infra/terraform apply 또는 terraform -chdir=infra/terraform apply tfplan 실행
+[ ] terraform -chdir=infra/terraform plan -var='environment=prod' 실행
+[ ] dashboard까지 테스트할 경우 terraform -chdir=infra/terraform plan -var='environment=prod' -var='enable_dashboard=true' 실행
+[ ] saved plan을 쓸 경우 terraform -chdir=infra/terraform plan -var='environment=prod' -out=tfplan 실행
+[ ] terraform -chdir=infra/terraform apply -var='environment=prod' 또는 terraform -chdir=infra/terraform apply tfplan 실행
 [ ] terraform output 저장
 [ ] github_webhook_url 확인
 [ ] Slack App Request URL 연결

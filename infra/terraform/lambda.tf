@@ -4,6 +4,7 @@ resource "aws_lambda_function" "analysis_orchestrator" {
   handler                        = "app.handler"
   runtime                        = "python3.12"
   filename                       = "${path.module}/../../build/analysis-orchestrator.zip"
+  source_code_hash               = filebase64sha256("${path.module}/../../build/analysis-orchestrator.zip")
   timeout                        = 300
   memory_size                    = 512
   reserved_concurrent_executions = 2
@@ -46,6 +47,7 @@ resource "aws_lambda_function" "slack_approval_handler" {
   handler                        = "app.handler"
   runtime                        = "python3.12"
   filename                       = "${path.module}/../../build/slack-approval-handler.zip"
+  source_code_hash               = filebase64sha256("${path.module}/../../build/slack-approval-handler.zip")
   timeout                        = 10
   memory_size                    = 256
   reserved_concurrent_executions = 2
@@ -67,6 +69,7 @@ resource "aws_lambda_function" "deployment_action_executor" {
   handler                        = "app.handler"
   runtime                        = "python3.12"
   filename                       = "${path.module}/../../build/deployment-action-executor.zip"
+  source_code_hash               = filebase64sha256("${path.module}/../../build/deployment-action-executor.zip")
   timeout                        = 30
   memory_size                    = 256
   reserved_concurrent_executions = 1
@@ -93,6 +96,7 @@ resource "aws_lambda_function" "github_webhook_handler" {
   handler                        = "app.handler"
   runtime                        = "python3.12"
   filename                       = "${path.module}/../../build/github-webhook-handler.zip"
+  source_code_hash               = filebase64sha256("${path.module}/../../build/github-webhook-handler.zip")
   timeout                        = 30
   memory_size                    = 256
   reserved_concurrent_executions = 2

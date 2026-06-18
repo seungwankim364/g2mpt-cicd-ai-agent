@@ -22,3 +22,4 @@
 | DOC-34 | [Dashboard Control Center Checklist](29-dashboard-control-center-checklist.md) | dashboard local backend, 버튼, live 연결 체크리스트 |
 | DOC-35 | [Final Status and User Checklist](30-final-status-and-user-checklist.md) | 지금까지 완료된 것, 남은 것, 사용자가 해야 할 일 |
 | DOC-36 | [GymPT App to GitOps to Quality Gate Flow](31-gympt-app-to-gitops-to-quality-gate-flow.md) | gympt-apps에서 gympt-gitops, cd-quality-gate까지 전체 세부 흐름 |
+| DOC-37 | [Clone to Run Step by Step](32-clone-to-run-step-by-step.md) | fresh clone 이후 local test, Lambda package, Terraform plan/apply, webhook, Slack, dashboard, destroy 실행 순서 |

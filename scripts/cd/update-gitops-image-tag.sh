@@ -8,9 +8,24 @@ GITOPS_REPO="${GITOPS_REPO:-hj-3/gympt-gitops}"
 GITOPS_PAT="${GITOPS_PAT:-}"
 VALUES_FILE="${VALUES_FILE:-}"
 
+normalize_image_tag() {
+  local value="$1"
+  if [[ "$value" == *"/"* && "$value" == *":"* ]]; then
+    printf '%s\n' "${value##*:}"
+    return
+  fi
+  printf '%s\n' "$value"
+}
+
+RAW_IMAGE_TAG="$IMAGE_TAG"
+IMAGE_TAG="$(normalize_image_tag "$IMAGE_TAG")"
+
 if [[ -z "$GITOPS_REPO" || -z "$VALUES_FILE" || -z "$GITOPS_PAT" ]]; then
   echo "GITOPS_REPO, GITOPS_PAT, or VALUES_FILE is not set. Dry-run only."
   echo "Would update $SERVICE_NAME/$ENVIRONMENT image tag to $IMAGE_TAG"
+  if [[ "$RAW_IMAGE_TAG" != "$IMAGE_TAG" ]]; then
+    echo "Normalized full image reference to tag: $RAW_IMAGE_TAG -> $IMAGE_TAG"
+  fi
   exit 0
 fi
 

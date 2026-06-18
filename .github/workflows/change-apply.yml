@@ -63,6 +63,14 @@ jobs:
               exit 2
               ;;
           esac
+          case "${{ inputs.action_type }}" in
+            restart_deployment|scale_replicas|increase_memory|increase_hpa)
+              if [ -z "$GITOPS_PAT" ]; then
+                echo "GH_WORKFLOW_DISPATCH_TOKEN is required to push approved GitOps changes." >&2
+                exit 2
+              fi
+              ;;
+          esac
 
       - name: Create change execution record
         run: |

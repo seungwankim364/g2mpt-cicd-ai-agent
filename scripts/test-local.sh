@@ -11,10 +11,10 @@ mkdir -p "$TMP_DIR"
 QUALITY_GATE_ALERT_NAMES="BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage,SQSQueueBacklog,SQSMessageAge,SQSDLQMessages,NodeHighCPUUsage,PodRestartFrequent,GPUHighUtilization,GPUMemoryHigh,RedisConnectionError,RedisHighMemory,RedisHighEvictionRate,BedrockHighErrorRate,BedrockThrottling"
 QUALITY_GATE_NAMESPACES="gympt-prod,monitoring,posture-analysis,elasticache"
 
-echo "[1/8] Shell syntax"
+echo "[1/9] Shell syntax"
 bash -n scripts/cd/*.sh scripts/quality-gate/*.sh scripts/runbooks/*.sh scripts/aws/*.sh
 
-echo "[2/8] Python compile"
+echo "[2/9] Python compile"
 python3 -m py_compile \
   scripts/quality-gate/*.py \
   lambda/analysis-orchestrator/*.py \
@@ -23,7 +23,7 @@ python3 -m py_compile \
   lambda/github-webhook-handler/*.py \
   ai-agent/app/*.py
 
-echo "[3/8] JSON fixtures and schemas"
+echo "[3/9] JSON fixtures and schemas"
 python3 -m json.tool tests/fixtures/prometheus-alerts.normal.json >/dev/null
 python3 -m json.tool tests/fixtures/prometheus-alerts.firing.json >/dev/null
 python3 -m json.tool tests/fixtures/prometheus-metrics.sample.json >/dev/null
@@ -32,7 +32,7 @@ python3 -m json.tool tests/fixtures/athena-summary.sample.json >/dev/null
 python3 -m json.tool lambda/analysis-orchestrator/events/deployment-failed.sample.json >/dev/null
 find schemas -name '*.json' -print0 | xargs -0 -I{} python3 -m json.tool {} >/dev/null
 
-echo "[4/8] Quality Gate pass fixture"
+echo "[4/9] Quality Gate pass fixture"
 FIXTURE_FILE=tests/fixtures/prometheus-alerts.normal.json \
 OUTPUT_FILE="$TMP_DIR/prometheus-alerts-normal.json" \
 scripts/quality-gate/query-prometheus-alerts.sh
@@ -52,7 +52,7 @@ OUTPUT_DIR="$TMP_DIR/window-normal" \
 HEALTH_CHECK_WINDOW_SECONDS=0 \
 scripts/quality-gate/run-health-check-window.sh
 
-echo "[5/8] Quality Gate fail fixture"
+echo "[5/9] Quality Gate fail fixture"
 FIXTURE_FILE=tests/fixtures/prometheus-alerts.firing.json \
 OUTPUT_FILE="$TMP_DIR/prometheus-alerts-firing.json" \
 scripts/quality-gate/query-prometheus-alerts.sh
@@ -78,7 +78,7 @@ if ALERT_FIXTURE_FILE=tests/fixtures/prometheus-alerts.firing.json \
   exit 1
 fi
 
-echo "[6/8] Slack payloads and EventBridge dry-run"
+echo "[6/9] Slack payloads and EventBridge dry-run"
 scripts/quality-gate/build-grafana-links.py \
   --base-url "https://grafana.g2mpt.com" \
   --dashboard-uid "api-latency" \
@@ -128,7 +128,51 @@ REASON="fixture approval" \
 OUTPUT_FILE="$TMP_DIR/deployment-action-approved-event.json" \
 scripts/quality-gate/publish-approved-action-event.sh
 
-echo "[7/8] AI Agent and Lambda local execution"
+echo "[7/9] Rollback target helpers"
+fake_bin="$TMP_DIR/bin"
+mkdir -p "$fake_bin"
+cat >"$fake_bin/kubectl" <<'SH'
+#!/usr/bin/env bash
+cat <<'JSON'
+{
+  "items": [
+    {
+      "metadata": {
+        "annotations": {"deployment.kubernetes.io/revision": "2"},
+        "ownerReferences": [{"kind": "Deployment", "name": "backend-api-prod"}]
+      },
+      "spec": {"template": {"spec": {"containers": [{"image": "337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:200-badbad1"}]}}}
+    },
+    {
+      "metadata": {
+        "annotations": {"deployment.kubernetes.io/revision": "1"},
+        "ownerReferences": [{"kind": "Deployment", "name": "backend-api-prod"}]
+      },
+      "spec": {"template": {"spec": {"containers": [{"image": "337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:199-good123"}]}}}
+    }
+  ]
+}
+JSON
+SH
+chmod +x "$fake_bin/kubectl"
+previous_image="$(
+  PATH="$fake_bin:$PATH" \
+  K8S_DEPLOYMENT=backend-api-prod \
+  K8S_NAMESPACE=gympt-prod \
+  CURRENT_IMAGE=337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:200-badbad1 \
+  scripts/cd/find-previous-k8s-image.sh
+)"
+test "$previous_image" = "337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:199-good123"
+
+SERVICE_NAME=backend-api \
+ENVIRONMENT=prod \
+IMAGE_TAG="$previous_image" \
+VALUES_FILE=charts/backend-api/values-prod.yaml \
+scripts/cd/update-gitops-image-tag.sh >"$TMP_DIR/update-gitops-image-tag-dry-run.txt"
+grep -q "Would update backend-api/prod image tag to 199-good123" "$TMP_DIR/update-gitops-image-tag-dry-run.txt"
+grep -q "Normalized full image reference to tag" "$TMP_DIR/update-gitops-image-tag-dry-run.txt"
+
+echo "[8/9] AI Agent and Lambda local execution"
 PYTHONPATH=ai-agent python3 -m app.main \
   --input-file tests/fixtures/athena-summary.sample.json \
   --output-file "$TMP_DIR/ai-recommendation.json" \
@@ -172,7 +216,7 @@ allowed, checks = module._should_dispatch(payload)
 assert not allowed and not checks["conclusion"]
 PY
 
-echo "[8/8] AWS terraform destroy script help"
+echo "[9/9] AWS terraform destroy script help"
 scripts/aws/destroy-terraform-stack.sh --help >/dev/null
 node --check dashboard/src/main.js >/dev/null
 node --check dashboard/server.mjs >/dev/null

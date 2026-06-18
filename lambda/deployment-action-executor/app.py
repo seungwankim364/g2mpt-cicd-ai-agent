@@ -62,7 +62,12 @@ def _secret_value(secret_arn):
 def _dispatch_workflow(repo, workflow_file, token, detail):
     if not repo:
         raise ValueError(f"No workflow repository configured for action {detail['actionType']}")
-    target_image_tag = detail.get("targetImageTag") or detail.get("currentImageTag", "")
+    if detail["actionType"] == "rollback" and not detail.get("targetImageTag"):
+        raise ValueError("rollback requires targetImageTag. Refusing to roll back to the current image.")
+    if detail.get("targetImageTag"):
+        target_image_tag = detail["targetImageTag"]
+    else:
+        target_image_tag = detail.get("currentImageTag", "")
     body = {
         "ref": os.environ.get("WORKFLOW_REF", "main"),
         "inputs": {

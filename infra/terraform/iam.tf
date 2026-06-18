@@ -210,10 +210,13 @@ resource "aws_iam_role_policy" "github_webhook_handler" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = compact([
+        Resource = length(compact([
           var.github_token_secret_arn,
           var.github_webhook_secret_arn
-        ])
+          ])) > 0 ? compact([
+          var.github_token_secret_arn,
+          var.github_webhook_secret_arn
+        ]) : ["*"]
       }
     ]
   })

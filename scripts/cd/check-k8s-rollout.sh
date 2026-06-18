@@ -7,6 +7,7 @@ ROLLOUT_TIMEOUT="${ROLLOUT_TIMEOUT:-300s}"
 EXPECTED_IMAGE="${EXPECTED_IMAGE:-${IMAGE_TAG:-}}"
 IMAGE_WAIT_TIMEOUT_SECONDS="${IMAGE_WAIT_TIMEOUT_SECONDS:-600}"
 IMAGE_WAIT_INTERVAL_SECONDS="${IMAGE_WAIT_INTERVAL_SECONDS:-10}"
+POD_SELECTOR="${POD_SELECTOR:-app.kubernetes.io/instance=$K8S_DEPLOYMENT}"
 
 if ! command -v kubectl >/dev/null 2>&1; then
   if [[ "${GITHUB_ACTIONS:-false}" == "true" ]]; then
@@ -41,4 +42,4 @@ fi
 
 kubectl -n "$K8S_NAMESPACE" rollout status "deployment/$K8S_DEPLOYMENT" --timeout "$ROLLOUT_TIMEOUT"
 kubectl -n "$K8S_NAMESPACE" get deploy "$K8S_DEPLOYMENT"
-kubectl -n "$K8S_NAMESPACE" get pods -l "app=$K8S_DEPLOYMENT"
+kubectl -n "$K8S_NAMESPACE" get pods -l "$POD_SELECTOR"

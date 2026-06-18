@@ -122,6 +122,22 @@ jobs:
             --links-file grafana-links.json \
             --output-file slack-first-alert.json
 
+      - name: Resolve rollback image tag
+        if: steps.evaluate.outcome == 'failure'
+        continue-on-error: true
+        env:
+          K8S_NAMESPACE: ${{ inputs.namespace }}
+          K8S_DEPLOYMENT: ${{ inputs.deployment }}
+          CURRENT_IMAGE: ${{ inputs.image_tag }}
+        run: |
+          rollback_image="$(scripts/cd/find-previous-k8s-image.sh || true)"
+          if [ -n "$rollback_image" ]; then
+            echo "ROLLBACK_IMAGE_TAG=$rollback_image" >> "$GITHUB_ENV"
+            echo "Resolved rollback image: $rollback_image"
+          else
+            echo "Could not resolve rollback image from previous ReplicaSet."
+          fi
+
       - name: Send Slack deploy complete alert
         if: steps.evaluate.outcome == 'success'
         continue-on-error: true

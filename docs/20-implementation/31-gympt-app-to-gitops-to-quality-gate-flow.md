@@ -690,7 +690,7 @@ EXPECTED_IMAGE=337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/back
 1. backend-api-prod Deployment의 container image가 EXPECTED_IMAGE와 같아질 때까지 대기
 2. kubectl rollout status deployment/backend-api-prod -n gympt-prod
 3. kubectl get deploy backend-api-prod -n gympt-prod
-4. kubectl get pods -l app=backend-api-prod -n gympt-prod
+4. kubectl get pods -l app.kubernetes.io/instance=backend-api-prod -n gympt-prod
 ```
 
 왜 image tag 확인을 먼저 하는가:
@@ -713,7 +713,7 @@ gympt-app workflow가 성공했다는 것은 ECR push와 gympt-gitops values com
 kubectl get deploy backend-api-prod -n gympt-prod -o jsonpath=...
 kubectl rollout status deployment/backend-api-prod -n gympt-prod
 kubectl get deploy backend-api-prod -n gympt-prod
-kubectl get pods -l app=backend-api-prod -n gympt-prod
+kubectl get pods -l app.kubernetes.io/instance=backend-api-prod -n gympt-prod
 ```
 
 왜 먼저 rollout을 확인하는가:
@@ -830,6 +830,7 @@ AI 분석은 Lambda/Athena/Bedrock 과정을 거치므로 시간이 더 걸릴 �
 실행 파일:
 
 ```text
+scripts/cd/find-previous-k8s-image.sh
 scripts/quality-gate/publish-eventbridge-event.sh
 ```
 
@@ -839,6 +840,18 @@ scripts/quality-gate/publish-eventbridge-event.sh
 event bus: cd-quality-gate-prod-bus
 source: cd.quality-gate
 detail-type: DeploymentFailed
+```
+
+rollback target:
+
+```text
+Quality Gate 실패 시 scripts/cd/find-previous-k8s-image.sh가
+backend-api-prod의 이전 ReplicaSet image를 찾아 ROLLBACK_IMAGE_TAG로 넣는다.
+
+이 값이 있어야 Slack rollback 승인 후 rollback.yml이 이전 image tag로 GitOps values를 되돌릴 수 있다.
+ReplicaSet에서는 전체 image URI가 나오지만, scripts/cd/update-gitops-image-tag.sh가
+`values-prod.yaml`의 `.image.tag`에 들어갈 tag 부분만 추출해서 기록한다.
+이전 image를 찾지 못하면 deployment-action-executor는 rollback을 current image로 대체하지 않고 실패시킨다.
 ```
 
 왜 EventBridge를 쓰는가:
@@ -1123,7 +1136,7 @@ CloudFront, S3, API Gateway, Lambda, DynamoDB가 추가로 생성된다.
 Dashboard를 AWS에 올릴 때:
 
 ```bash
-terraform -chdir=infra/terraform plan -var='enable_dashboard=true'
+terraform -chdir=infra/terraform plan -var='environment=prod' -var='enable_dashboard=true'
 ```
 
 Dashboard가 보여주는 것:
@@ -1228,7 +1241,7 @@ AWS CLI login을 Terraform에서 쓸 때:
 
 ```bash
 eval "$(aws configure export-credentials --profile ksw2 --format env)"
-terraform -chdir=infra/terraform plan
+terraform -chdir=infra/terraform plan -var='environment=prod'
 ```
 
 ---
