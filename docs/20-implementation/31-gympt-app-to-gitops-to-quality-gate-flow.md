@@ -223,7 +223,770 @@ CloudFront invalidation:
 
 ---
 
-### 3.3 `gympt-gitops`
+### 3.3 `gympt-app` workflow 상세 설명
+
+이 섹션은 `gympt-ops/gympt-app/.github/workflows` 아래의 주요 workflow가 실제로 어떤 일을 하는지 설명한다.
+
+중요한 전제:
+
+```text
+cd-quality-gate-architecture는 gympt-app workflow를 직접 수정하지 않는다.
+여기서는 gympt-app의 기존 workflow가 어떤 방식으로 build/deploy/GitOps update를 수행하는지 읽고,
+그 이후에 Quality Gate를 어디에 붙이는지 이해하기 위해 설명한다.
+```
+
+대상 workflow:
+
+```text
+../gympt-ops/gympt-app/.github/workflows/agent-service-ci.yml
+../gympt-ops/gympt-app/.github/workflows/backend-api-ci.yml
+../gympt-ops/gympt-app/.github/workflows/frontend-deploy.yml
+../gympt-ops/gympt-app/.github/workflows/kvs-consumer-service-ci.yml
+../gympt-ops/gympt-app/.github/workflows/lambda-package.yml
+../gympt-ops/gympt-app/.github/workflows/posture-analysis-service-ci.yml
+../gympt-ops/gympt-app/.github/workflows/report-service-ci.yml
+```
+
+#### 3.3.1 공통 Backend/Python 서비스 workflow 패턴
+
+아래 workflow들은 구조가 거의 같다.
+
+```text
+agent-service-ci.yml
+backend-api-ci.yml
+kvs-consumer-service-ci.yml
+posture-analysis-service-ci.yml
+report-service-ci.yml
+```
+
+공통 흐름:
+
+```text
+1. 서비스 코드 또는 workflow 파일 변경 감지
+2. test/build job 실행
+3. pull_request가 아니면 Docker image build
+4. AWS OIDC Role Assume
+5. Amazon ECR login
+6. Docker image tag 생성
+7. Docker image build
+8. Trivy 취약점 스캔
+9. ECR push
+10. hj-3/gympt-gitops checkout
+11. yq로 values-dev.yaml 또는 values-prod.yaml image.tag 수정
+12. gympt-gitops main branch에 commit/push
+13. Argo CD가 GitOps 변경을 감지해 EKS에 sync
+```
+
+공통으로 사용하는 image tag 규칙:
+
+```text
+${{ github.run_number }}-${GITHUB_SHA:0:7}
+```
+
+예:
+
+```text
+115-5c35fc1
+```
+
+이 규칙이 중요한 이유:
+
+```text
+배포 image가 어떤 GitHub Actions run에서 만들어졌는지 알 수 있다.
+앞 7자리 commit SHA로 어떤 코드가 배포됐는지 추적할 수 있다.
+rollback 시 이전 values image.tag로 되돌릴 수 있다.
+latest tag를 쓰지 않아 배포 버전이 명확하다.
+```
+
+branch 기준 환경 결정:
+
+```text
+main branch:
+  environment=prod
+
+dev branch:
+  environment=dev
+```
+
+AWS 인증 방식:
+
+```text
+aws-actions/configure-aws-credentials@v4
+role-to-assume:
+  prod이면 vars.AWS_ROLE_PROD
+  dev이면 vars.AWS_ROLE_DEV
+```
+
+이 방식은 GitHub Actions에 AWS access key를 직접 저장하지 않고, OIDC 기반 임시 자격 증명을 사용한다.
+
+GitOps update 방식:
+
+```text
+repository: hj-3/gympt-gitops
+token: secrets.GITOPS_PAT
+tool: yq
+update target:
+  charts/<service>/values-${ENVIRONMENT}.yaml
+field:
+  .image.tag
+```
+
+commit 방식:
+
+```text
+git add charts/<service>/values-${ENVIRONMENT}.yaml
+git commit -m "ci: update <service> <environment> image to <image-tag>"
+git pull --rebase origin main
+git push origin main
+```
+
+이 구조에서 GitHub Actions의 책임은 ECR push와 GitOps values update까지다.
+
+EKS에 실제 pod를 바꾸는 책임은 Argo CD가 가진다.
+
+---
+
+#### 3.3.2 `backend-api-ci.yml`
+
+파일:
+
+```text
+../gympt-ops/gympt-app/.github/workflows/backend-api-ci.yml
+```
+
+역할:
+
+```text
+backend-api Java/Spring 계열 서비스를 build하고,
+Docker image를 ECR에 push한 뒤,
+gympt-gitops의 backend-api Helm values image.tag를 변경한다.
+```
+
+trigger:
+
+```text
+push:
+  branches: main, dev
+  paths:
+    - backend-api/**
+    - .github/workflows/backend-api-ci.yml
+
+pull_request:
+  paths:
+    - backend-api/**
+
+workflow_dispatch:
+  수동 실행 가능
+```
+
+job 구성:
+
+```text
+build
+  -> Java 21 설정
+  -> Gradle wrapper 실행 권한 부여
+  -> Gradle version 확인
+  -> ./gradlew clean build -x test --no-daemon --refresh-dependencies
+
+build-and-push
+  -> build job 이후 실행
+  -> pull_request에서는 실행하지 않음
+  -> image tag 생성
+  -> main/dev 기준 environment 결정
+  -> AWS OIDC Role Assume
+  -> ECR login
+  -> Docker image build
+  -> Trivy scan
+  -> Docker image push
+
+update-gitops
+  -> hj-3/gympt-gitops checkout
+  -> yq 설치
+  -> charts/backend-api/values-${ENVIRONMENT}.yaml의 .image.tag 수정
+  -> GitOps repo main에 commit/push
+```
+
+Docker image URI 형태:
+
+```text
+${ECR_REGISTRY}/gympt-${ENVIRONMENT}/backend-api:${IMAGE_TAG}
+```
+
+예:
+
+```text
+337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api:115-5c35fc1
+```
+
+Quality Gate와의 관계:
+
+```text
+backend-api-ci.yml이 성공적으로 끝나고 GitOps values update까지 완료되면,
+GitHub workflow_run completed webhook이 cd-quality-gate API Gateway로 전달된다.
+
+cd-quality-gate는 이 workflow의 run_number와 head_sha를 이용해
+이번 배포 image tag를 계산하고 quality-gate.yml을 실행한다.
+```
+
+주의:
+
+```text
+현재 build 명령은 -x test로 test를 제외한다.
+Trivy는 exit-code 0으로 리포트 전용이다.
+즉, 현재는 구축/검증 단계 기준으로 안정성을 해치지 않게 리포트만 남긴다.
+운영 강화 시 test 포함, Trivy exit-code 1 적용을 검토할 수 있다.
+```
+
+---
+
+#### 3.3.3 `agent-service-ci.yml`
+
+파일:
+
+```text
+../gympt-ops/gympt-app/.github/workflows/agent-service-ci.yml
+```
+
+역할:
+
+```text
+agent-service Python 서비스를 lint/test하고,
+Docker image를 ECR에 push한 뒤,
+gympt-gitops의 agent-service values image.tag를 변경한다.
+```
+
+trigger:
+
+```text
+push:
+  branches: main, dev
+  paths:
+    - agent-service/**
+    - .github/workflows/agent-service-ci.yml
+
+pull_request:
+  paths:
+    - agent-service/**
+    - .github/workflows/agent-service-ci.yml
+
+workflow_dispatch:
+  수동 실행 가능
+```
+
+환경:
+
+```text
+PYTHON_VERSION=3.12
+AWS_REGION=ap-northeast-2
+ECR_REPOSITORY=agent-service
+GITOPS_REPO=hj-3/gympt-gitops
+```
+
+job 구성:
+
+```text
+test
+  -> Python 3.12 설정
+  -> pip cache 사용
+  -> requirements.txt 설치
+  -> ruff, pytest, pytest-cov 설치
+  -> ruff check app/
+  -> pytest tests 실행
+  -> integration/e2e/performance/slow test 제외
+  -> coverage.xml 업로드
+
+build-and-push
+  -> pull_request에서는 실행하지 않음
+  -> image tag 생성
+  -> environment 결정
+  -> AWS OIDC Role Assume
+  -> ECR login
+  -> agent-service Docker build
+  -> Trivy scan
+  -> ECR push
+
+update-gitops
+  -> hj-3/gympt-gitops checkout
+  -> charts/agent-service/values-${ENVIRONMENT}.yaml 수정
+  -> .image.tag = IMAGE_TAG
+  -> commit/push
+```
+
+GitOps 수정 대상:
+
+```text
+charts/agent-service/values-${ENVIRONMENT}.yaml
+```
+
+특징:
+
+```text
+pytest는 continue-on-error: true로 설정되어 있다.
+즉, 테스트 실패가 있어도 workflow 전체가 즉시 실패하지 않을 수 있다.
+현재는 구축 단계에서 리포트와 흐름 확인을 우선한 설정으로 볼 수 있다.
+```
+
+---
+
+#### 3.3.4 `posture-analysis-service-ci.yml`
+
+파일:
+
+```text
+../gympt-ops/gympt-app/.github/workflows/posture-analysis-service-ci.yml
+```
+
+역할:
+
+```text
+posture-analysis-service Python 서비스를 lint/test하고,
+Docker image를 ECR에 push한 뒤,
+gympt-gitops의 posture-analysis-service values image.tag를 변경한다.
+```
+
+trigger:
+
+```text
+push:
+  branches: main, dev
+  paths:
+    - posture-analysis-service/**
+    - .github/workflows/posture-analysis-service-ci.yml
+
+pull_request:
+  paths:
+    - posture-analysis-service/**
+    - .github/workflows/posture-analysis-service-ci.yml
+
+workflow_dispatch:
+  수동 실행 가능
+```
+
+환경:
+
+```text
+PYTHON_VERSION=3.12
+AWS_REGION=ap-northeast-2
+ECR_REPOSITORY=posture-analysis-service
+```
+
+job 구성:
+
+```text
+test
+  -> Python 3.12 설정
+  -> requirements.txt 설치
+  -> pytest, pytest-asyncio, pytest-cov, ruff 설치
+  -> ruff check app/
+  -> tests/e2e 대상으로 pytest 실행
+  -> timeout 120 적용
+  -> cov-fail-under=40
+  -> continue-on-error 성격으로 실패해도 true 처리
+
+build-and-push
+  -> image tag 생성
+  -> environment 결정
+  -> AWS OIDC Role Assume
+  -> ECR login
+  -> Docker build
+  -> Trivy scan
+  -> ECR push
+
+update-gitops
+  -> hj-3/gympt-gitops checkout
+  -> charts/posture-analysis-service/values-${ENVIRONMENT}.yaml 수정
+  -> commit/push
+```
+
+GitOps 수정 대상:
+
+```text
+charts/posture-analysis-service/values-${ENVIRONMENT}.yaml
+```
+
+주의:
+
+```text
+build-and-push job의 Docker image tag는 github.run_number와 short-sha로 생성한다.
+update-gitops job도 needs.build-and-push.outputs.image-tag를 values에 기록한다.
+두 값이 같은 규칙을 사용하므로 Argo CD가 배포할 tag와 ECR에 push된 tag가 맞아야 한다.
+```
+
+---
+
+#### 3.3.5 `kvs-consumer-service-ci.yml`
+
+파일:
+
+```text
+../gympt-ops/gympt-app/.github/workflows/kvs-consumer-service-ci.yml
+```
+
+역할:
+
+```text
+kvs-consumer-service Python 서비스를 테스트하고,
+Docker image를 ECR에 push한 뒤,
+gympt-gitops의 kvs-consumer-service values image.tag를 변경한다.
+```
+
+trigger:
+
+```text
+push:
+  branches: main, dev
+  paths:
+    - kvs-consumer-service/**
+    - .github/workflows/kvs-consumer-service-ci.yml
+
+pull_request:
+  paths:
+    - kvs-consumer-service/**
+
+workflow_dispatch:
+  수동 실행 가능
+```
+
+환경:
+
+```text
+PYTHON_VERSION=3.11
+AWS_REGION=ap-northeast-2
+ECR_REPOSITORY=kvs-consumer-service
+GITOPS_REPO=hj-3/gympt-gitops
+```
+
+job 구성:
+
+```text
+test
+  -> Python 3.11 설정
+  -> kvs-consumer-service/requirements.txt 기준 pip cache
+  -> requirements.txt 설치
+  -> pytest, pytest-asyncio, httpx 설치
+  -> pytest tests 실행
+  -> 테스트가 없으면 "No tests found yet" 출력
+
+build-and-push
+  -> image tag 생성
+  -> environment 결정
+  -> AWS OIDC Role Assume
+  -> ECR login
+  -> Docker build
+  -> Trivy scan
+  -> ECR push
+
+update-gitops
+  -> hj-3/gympt-gitops checkout
+  -> charts/kvs-consumer-service/values-${ENVIRONMENT}.yaml 수정
+  -> commit/push
+```
+
+GitOps 수정 대상:
+
+```text
+charts/kvs-consumer-service/values-${ENVIRONMENT}.yaml
+```
+
+운영 관점 의미:
+
+```text
+kvs-consumer-service는 비동기/스트림성 consumer 성격의 서비스로 볼 수 있다.
+배포 후에는 EKS pod 상태뿐 아니라 SQS/KVS/worker 처리 지연 같은 지표도 함께 봐야 한다.
+Quality Gate가 backend-api 중심에서 infra alert까지 확장된 이유도 이런 주변 의존성 때문이다.
+```
+
+---
+
+#### 3.3.6 `report-service-ci.yml`
+
+파일:
+
+```text
+../gympt-ops/gympt-app/.github/workflows/report-service-ci.yml
+```
+
+역할:
+
+```text
+report-service Python 서비스를 테스트하고,
+Docker image를 ECR에 push한 뒤,
+gympt-gitops의 report-service values image.tag를 변경한다.
+```
+
+trigger:
+
+```text
+push:
+  branches: main, dev
+  paths:
+    - report-service/**
+    - .github/workflows/report-service-ci.yml
+
+pull_request:
+  paths:
+    - report-service/**
+
+workflow_dispatch:
+  수동 실행 가능
+```
+
+환경:
+
+```text
+PYTHON_VERSION=3.11
+AWS_REGION=ap-northeast-2
+ECR_REPOSITORY=report-service
+GITOPS_REPO=hj-3/gympt-gitops
+```
+
+job 구성:
+
+```text
+test
+  -> Python 3.11 설정
+  -> report-service/requirements.txt 기준 pip cache
+  -> requirements.txt 설치
+  -> pytest, pytest-asyncio, httpx 설치
+  -> pytest tests 실행
+  -> 테스트가 없으면 skip 메시지 출력
+
+build-and-push
+  -> image tag 생성
+  -> environment 결정
+  -> AWS OIDC Role Assume
+  -> ECR login
+  -> report-service Docker build
+  -> Trivy scan
+  -> ECR push
+
+update-gitops
+  -> hj-3/gympt-gitops checkout
+  -> charts/report-service/values-${ENVIRONMENT}.yaml 수정
+  -> commit/push
+```
+
+GitOps 수정 대상:
+
+```text
+charts/report-service/values-${ENVIRONMENT}.yaml
+```
+
+운영 관점 의미:
+
+```text
+report-service는 사용자에게 결과물이나 분석 리포트를 제공하는 서비스이므로,
+배포 후에는 API latency뿐 아니라 S3 저장, queue 처리, downstream dependency까지 확인하는 것이 좋다.
+```
+
+---
+
+#### 3.3.7 `frontend-deploy.yml`
+
+파일:
+
+```text
+../gympt-ops/gympt-app/.github/workflows/frontend-deploy.yml
+```
+
+역할:
+
+```text
+frontend 코드를 build한 뒤,
+정적 산출물을 S3에 업로드하고,
+CloudFront cache invalidation으로 사용자에게 최신 화면을 반영한다.
+```
+
+trigger:
+
+```text
+push:
+  branches:
+    - main
+  paths:
+    - frontend/**
+    - .github/workflows/frontend-deploy.yml
+
+workflow_dispatch:
+  수동 실행 가능
+```
+
+환경:
+
+```text
+NODE_VERSION=20
+AWS_REGION=ap-northeast-2
+```
+
+job 구성:
+
+```text
+deploy
+  -> repository checkout
+  -> Node.js 20 설정
+  -> npm ci
+  -> npm run lint || true
+  -> npm run typecheck
+  -> main이면 prod 환경 결정
+  -> prod bucket/distribution/API URL 설정
+  -> npm run build:prod
+  -> AWS OIDC Role Assume
+  -> _next/static S3 sync with long cache
+  -> HTML/other files S3 sync with no-cache
+  -> CloudFront invalidation /*
+  -> GitHub step summary 작성
+```
+
+S3 sync가 두 번 나뉘는 이유:
+
+```text
+_next/static:
+  hash 기반 정적 asset이다.
+  파일명이 바뀌면 새 asset으로 인식되므로 long cache가 가능하다.
+
+HTML 및 기타 파일:
+  최신 JS/CSS asset 경로를 참조해야 한다.
+  오래 캐시되면 사용자가 이전 bundle을 볼 수 있으므로 no-cache로 업로드한다.
+```
+
+CloudFront invalidation이 필요한 이유:
+
+```text
+CloudFront edge cache에 이전 index.html 또는 asset 참조가 남을 수 있다.
+배포 후 /* invalidation을 수행하면 최신 정적 파일이 사용자에게 반영된다.
+```
+
+Quality Gate와의 관계:
+
+```text
+현재 cd-quality-gate의 자동 webhook 연결 대상은 backend-api workflow다.
+frontend는 EKS rollout이 아니라 S3/CloudFront 배포이므로 검증 기준이 다르다.
+
+frontend까지 Quality Gate를 확장하려면:
+  CloudFront URL health check
+  주요 page smoke test
+  S3 object existence check
+  CloudFront invalidation status check
+  frontend error monitoring
+같은 별도 검증이 필요하다.
+```
+
+---
+
+#### 3.3.8 `lambda-package.yml`
+
+파일:
+
+```text
+../gympt-ops/gympt-app/.github/workflows/lambda-package.yml
+```
+
+역할:
+
+```text
+lambdas 아래 여러 Lambda 함수를 matrix로 테스트하고,
+각 Lambda별 deployment zip을 만든 뒤,
+S3 artifact bucket에 업로드한다.
+옵션이 켜져 있으면 Lambda function code까지 업데이트한다.
+```
+
+trigger:
+
+```text
+push:
+  branches:
+    - main
+  paths:
+    - lambdas/**
+    - .github/workflows/lambda-package.yml
+
+workflow_dispatch:
+  수동 실행 가능
+```
+
+대상 Lambda matrix:
+
+```text
+agent-action
+report-generator
+posture-event-processor
+thumbnail-generator
+wearable-sync
+recommendation-update
+notification
+export
+```
+
+job 구성:
+
+```text
+test
+  -> Lambda matrix별 실행
+  -> Python 3.12 설정
+  -> lambdas/<lambda>/requirements.txt 설치
+  -> pytest, pytest-cov 설치
+  -> pytest tests 실행
+  -> 테스트가 없으면 skip 메시지 출력
+
+package-and-upload
+  -> test job 이후 실행
+  -> Lambda matrix별 실행
+  -> requirements.txt를 package/ 디렉터리에 설치
+  -> handler.py를 package/에 복사
+  -> zip 파일 생성
+  -> main이면 environment=prod
+  -> AWS OIDC Role Assume
+  -> 현재 AWS account id 조회
+  -> S3 bucket 이름 계산
+  -> S3에 <lambda>.zip으로 업로드
+  -> AUTO_UPDATE_LAMBDA == true이면 aws lambda update-function-code 실행
+```
+
+S3 artifact bucket 규칙:
+
+```text
+gympt-${environment}-lambda-artifacts-${account_id}
+```
+
+업로드 key:
+
+```text
+${lambda}.zip
+```
+
+Lambda function 이름 규칙:
+
+```text
+gympt-${environment}-${lambda}
+```
+
+이 방식의 의미:
+
+```text
+Lambda 함수라는 인프라 자체는 Terraform에서 만들 수 있다.
+Lambda 코드 변경은 GitHub Actions가 zip을 만들어 S3에 올린다.
+AUTO_UPDATE_LAMBDA=true이면 같은 workflow에서 함수 코드까지 바로 갱신한다.
+```
+
+Quality Gate와의 관계:
+
+```text
+이 workflow는 gympt-app의 서비스 Lambda 배포 흐름이다.
+cd-quality-gate의 analysis-orchestrator, slack-approval-handler, deployment-action-executor Lambda와는 별도다.
+
+즉:
+  gympt-app lambda-package.yml
+    -> gympt 서비스용 Lambda 코드 배포
+
+  cd-quality-gate scripts/lambda/package-analysis-orchestrator.sh
+    -> Quality Gate/AI 분석/Slack 승인용 Lambda zip 생성
+```
+
+둘 다 Lambda zip을 만든다는 점은 같지만, 소유 repo와 목적이 다르다.
+
+---
+
+### 3.4 `gympt-gitops`
 
 `gympt-gitops`는 EKS에 배포할 상태를 Git으로 선언하는 repo다.
 
@@ -263,7 +1026,7 @@ gympt-gitops main 변경
 
 ---
 
-### 3.4 왜 Helm Chart가 필요한가
+### 3.5 왜 Helm Chart가 필요한가
 
 Kubernetes 배포 파일은 보통 Deployment, Service, Ingress, HPA, ServiceMonitor 등 여러 파일로 나뉜다.
 
