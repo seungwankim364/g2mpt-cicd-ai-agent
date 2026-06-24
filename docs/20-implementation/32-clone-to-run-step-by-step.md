@@ -469,8 +469,9 @@ GitHub webhook
 
 ```text
 Quality Gate는 실제 배포 image tag가 EKS Deployment에 반영됐는지 확인한다.
-그 다음 Prometheus alert/metric을 5분 동안 확인한다.
+그 다음 Prometheus alert/metric과 AWS CloudWatch Alarm을 5분 동안 확인한다.
 EKS node나 Prometheus가 꺼져 있으면 live Quality Gate는 정상 판단을 할 수 없다.
+CloudWatch alarm 조회도 AWS OIDC role이 `cloudwatch:DescribeAlarms`, `cloudwatch:GetMetricStatistics` 권한을 가져야 정상 동작한다.
 ```
 
 ---
@@ -502,7 +503,7 @@ quality-gate.yml workflow_dispatch
 ↓
 check-k8s-rollout.sh로 실제 image tag 반영 확인
 ↓
-run-health-check-window.sh로 Prometheus 5분 검증
+run-health-check-window.sh로 Prometheus + CloudWatch 5분 검증
 ↓
 성공: Slack 배포 완료 알림
 ↓
@@ -545,6 +546,7 @@ Dashboard에서 확인할 항목:
 최근 GitHub Actions 성공/실패
 Argo CD sync/health 상태
 Prometheus firing alert
+CloudWatch ALARM 상태 리소스
 Quality Gate 상태
 Slack 승인 action 상태
 rollback/fix/change 요청 상태

@@ -82,6 +82,19 @@ def wait_or_collect_query_results(query_ids):
 
 
 def build_summary(detail, query_results):
+    cloudwatch_signals = [
+        {
+            "name": alarm.get("alarmName", "unknown"),
+            "severity": "critical" if alarm.get("state") == "ALARM" else "warning",
+            "summary": "{category} CloudWatch alarm is {state}: {reason}".format(
+                category=alarm.get("category", "unknown"),
+                state=alarm.get("state", "unknown"),
+                reason=alarm.get("reason") or alarm.get("metricName") or "No reason",
+            ),
+            "evidence": alarm,
+        }
+        for alarm in detail.get("cloudwatchAlarms", [])
+    ]
     return {
         "deploymentId": detail["deploymentId"],
         "service": detail["service"],
@@ -91,6 +104,10 @@ def build_summary(detail, query_results):
         "failedAt": detail["failedAt"],
         "analysisWindow": build_analysis_window(detail["failedAt"]),
         "alerts": detail.get("alerts", []),
+        "cloudwatchAlarms": detail.get("cloudwatchAlarms", []),
+        "cloudwatchInsufficientDataAlarms": detail.get("cloudwatchInsufficientDataAlarms", []),
+        "awsHealth": detail.get("awsHealth", {}),
+        "awsMetricEvidence": detail.get("awsMetricEvidence", {}),
         "grafanaLinks": detail.get("grafanaLinks", {}),
         "prometheusLinks": detail.get("prometheusLinks", {}),
         "argocdUrl": detail.get("argocdUrl", ""),
@@ -102,7 +119,8 @@ def build_summary(detail, query_results):
                 "evidence": alert,
             }
             for alert in detail.get("alerts", [])
-        ],
+        ]
+        + cloudwatch_signals,
         "queryResults": query_results,
     }
 

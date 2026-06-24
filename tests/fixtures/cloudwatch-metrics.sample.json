@@ -1,0 +1,21 @@
+{
+  "status": "collected",
+  "windowSeconds": 300,
+  "datapoints": [
+    {
+      "alarmName": "gympt-prod-rds-connections-high",
+      "region": "ap-northeast-2",
+      "namespace": "AWS/RDS",
+      "metricName": "DatabaseConnections",
+      "statistic": "Average",
+      "period": 300,
+      "datapoints": [
+        {
+          "Timestamp": "2026-06-24T00:00:00Z",
+          "Average": 95.0,
+          "Unit": "Count"
+        }
+      ]
+    }
+  ]
+}

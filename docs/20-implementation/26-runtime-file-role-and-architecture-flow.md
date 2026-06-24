@@ -22,7 +22,7 @@ Developer 또는 운영자
   -> .github/workflows/quality-gate.yml 실행 또는 기존 workflow에서 호출
   -> scripts/cd/check-k8s-rollout.sh
   -> scripts/quality-gate/run-health-check-window.sh
-     -> 5분 동안 Prometheus alert/metric 반복 조회
+     -> 5분 동안 Prometheus alert/metric과 CloudWatch alarm 반복 조회
      -> scripts/quality-gate/query-prometheus-alerts.sh
      -> scripts/quality-gate/query-prometheus-metrics.sh
      -> scripts/quality-gate/evaluate-quality-gate.py
@@ -198,9 +198,10 @@ cd-quality-gate-runtime
 | Argo CD automated sync | `argocd/applications/prod/backend-api.yaml` in `gympt-ops` | GitOps 변경을 감지해 `backend-api-prod`를 자동 sync |
 | Kubernetes rollout | `scripts/cd/check-k8s-rollout.sh` | self-hosted runner에서 `K8S_NAMESPACE=gympt-prod`, `K8S_DEPLOYMENT=backend-api-prod` rollout 상태 확인 |
 | Quality Gate | `.github/workflows/quality-gate.yml` | rollout 확인 후 5분 Health Check Window를 실행하고, Slack 알림/EventBridge 발행을 처리 |
-| Health Check Window | `scripts/quality-gate/run-health-check-window.sh` | 기본 300초 동안 60초 간격으로 0초~300초 지점까지 Prometheus alert/metric을 조회하고 sample 결과를 집계 |
+| Health Check Window | `scripts/quality-gate/run-health-check-window.sh` | 기본 300초 동안 60초 간격으로 0초~300초 지점까지 Prometheus alert/metric과 CloudWatch alarm을 조회하고 결과를 집계 |
 | Prometheus alerts | `scripts/quality-gate/query-prometheus-alerts.sh` | Prometheus API에서 현재 alert 목록을 조회하거나 fixture로 대체 |
 | Prometheus metrics | `scripts/quality-gate/query-prometheus-metrics.sh` | 배포 직후 판단에 필요한 metric snapshot을 조회 |
+| CloudWatch alarms | `scripts/quality-gate/query-cloudwatch-alarms.py` | RDS/Lambda/ALB/S3/CloudFront/KVS 등 AWS 리소스 alarm을 리전별로 전수 조회하고 metric evidence를 생성 |
 | Gate decision | `scripts/quality-gate/evaluate-quality-gate.py` | 각 sample에서 firing alert 중 서비스/namespace/alert name이 일치하는 항목이 있으면 실패 처리 |
 | Grafana links | `scripts/quality-gate/build-grafana-links.py` | Slack 메시지에 넣을 Grafana dashboard URL 생성 |
 | Slack 1차 실패 알림 | `scripts/quality-gate/send-slack-first-alert.py` | 5분 Health Check Window 실패 확정 후 `#cd-deploy-alarm`에 alert, Grafana, Prometheus, Argo CD, GitHub Actions 링크 포함 payload 생성/전송 |
@@ -291,7 +292,7 @@ SLACK_CHANNEL=#cd-deploy-alarm
 ```text
 1. Kubernetes rollout 확인
 2. 5분 Health Check Window 실행
-3. 60초 간격으로 Prometheus alert/metric 조회
+3. 60초 간격으로 Prometheus alert/metric과 CloudWatch alarm 조회
 4. 각 sample마다 Quality Gate pass/fail 판단
 5. 전체 window 결과를 quality-gate-result.json으로 집계
 6. Grafana link 생성

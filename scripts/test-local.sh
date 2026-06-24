@@ -27,6 +27,9 @@ echo "[3/9] JSON fixtures and schemas"
 python3 -m json.tool tests/fixtures/prometheus-alerts.normal.json >/dev/null
 python3 -m json.tool tests/fixtures/prometheus-alerts.firing.json >/dev/null
 python3 -m json.tool tests/fixtures/prometheus-metrics.sample.json >/dev/null
+python3 -m json.tool tests/fixtures/cloudwatch-alarms.normal.json >/dev/null
+python3 -m json.tool tests/fixtures/cloudwatch-alarms.firing.json >/dev/null
+python3 -m json.tool tests/fixtures/cloudwatch-metrics.sample.json >/dev/null
 python3 -m json.tool tests/fixtures/deployment-failed.sample.json >/dev/null
 python3 -m json.tool tests/fixtures/athena-summary.sample.json >/dev/null
 python3 -m json.tool lambda/analysis-orchestrator/events/deployment-failed.sample.json >/dev/null
@@ -46,6 +49,8 @@ scripts/quality-gate/evaluate-quality-gate.py \
   --output-file "$TMP_DIR/quality-gate-result-normal.json"
 
 ALERT_FIXTURE_FILE=tests/fixtures/prometheus-alerts.normal.json \
+CLOUDWATCH_FIXTURE_FILE=tests/fixtures/cloudwatch-alarms.normal.json \
+CLOUDWATCH_METRICS_FIXTURE_FILE=tests/fixtures/cloudwatch-metrics.sample.json \
 ALERT_NAMES="$QUALITY_GATE_ALERT_NAMES" \
 MONITORED_NAMESPACES="$QUALITY_GATE_NAMESPACES" \
 OUTPUT_DIR="$TMP_DIR/window-normal" \
@@ -69,6 +74,8 @@ if scripts/quality-gate/evaluate-quality-gate.py \
 fi
 
 if ALERT_FIXTURE_FILE=tests/fixtures/prometheus-alerts.firing.json \
+CLOUDWATCH_FIXTURE_FILE=tests/fixtures/cloudwatch-alarms.firing.json \
+CLOUDWATCH_METRICS_FIXTURE_FILE=tests/fixtures/cloudwatch-metrics.sample.json \
   ALERT_NAMES="$QUALITY_GATE_ALERT_NAMES" \
   MONITORED_NAMESPACES="$QUALITY_GATE_NAMESPACES" \
   OUTPUT_DIR="$TMP_DIR/window-firing" \
@@ -95,7 +102,7 @@ scripts/quality-gate/build-grafana-links.py \
   --output-file "$TMP_DIR/grafana-links.json"
 
 SLACK_CHANNEL="#cd-deploy-alarm" scripts/quality-gate/send-slack-first-alert.py \
-  --result-file "$TMP_DIR/quality-gate-result-firing.json" \
+  --result-file "$TMP_DIR/window-firing/quality-gate-result.json" \
   --links-file "$TMP_DIR/grafana-links.json" \
   --output-file "$TMP_DIR/slack-first-alert.json" \
   --dry-run
@@ -111,7 +118,7 @@ DRY_RUN=true \
 SERVICE_NAME=backend-api \
 ENVIRONMENT=prod \
 IMAGE_TAG=fixture \
-QUALITY_GATE_RESULT_FILE="$TMP_DIR/quality-gate-result-firing.json" \
+QUALITY_GATE_RESULT_FILE="$TMP_DIR/window-firing/quality-gate-result.json" \
 GRAFANA_LINKS_FILE="$TMP_DIR/grafana-links.json" \
 OUTPUT_FILE="$TMP_DIR/deployment-failed-event.json" \
 scripts/quality-gate/publish-eventbridge-event.sh

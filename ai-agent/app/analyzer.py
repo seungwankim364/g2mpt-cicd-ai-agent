@@ -5,7 +5,7 @@ except ImportError:
 
 
 def _alert_name(alert: dict) -> str:
-    return alert.get("alertName") or alert.get("labels", {}).get("alertname", "UnknownAlert")
+    return alert.get("alertName") or alert.get("name") or alert.get("labels", {}).get("alertname", "UnknownAlert")
 
 
 def _alert_severity(alert: dict) -> str:
@@ -17,8 +17,10 @@ def _summary(alert: dict) -> str:
 
 
 def _recommended_action(alerts: list[dict], signals: list[dict]) -> tuple[str, str]:
-    names = {_alert_name(alert) for alert in alerts}
-    severities = {_alert_severity(alert) for alert in alerts}
+    evidence_items = alerts + signals
+    names = {_alert_name(alert) for alert in evidence_items}
+    normalized_names = {name.lower() for name in names}
+    severities = {_alert_severity(alert) for alert in evidence_items}
 
     if "BackendHighMemoryUsage" in names:
         return "increase_memory", "Memory pressure is visible during the deploy window."
@@ -34,6 +36,12 @@ def _recommended_action(alerts: list[dict], signals: list[dict]) -> tuple[str, s
         return "open_fix_issue", "Dependency or data-plane alerts need operator review before a safe change."
     if "WAFBlockedRequestSpike" in names:
         return "open_fix_issue", "WAF behavior needs rule/config review before a safe change."
+    if any(("rds" in name or "s3" in name or "cloudfront" in name or "kvs" in name or "dynamodb" in name or "eventbridge" in name or "athena" in name) for name in normalized_names):
+        return "open_fix_issue", "AWS managed resource alarm needs operator review with the matching CloudWatch runbook."
+    if any(("lambda" in name and ("error" in name or "throttle" in name or "duration" in name)) for name in normalized_names):
+        return "open_fix_issue", "Lambda CloudWatch alarm needs log and retry/DLQ review before an automated change."
+    if any(("alb" in name and ("5xx" in name or "unhealthy" in name)) for name in normalized_names):
+        return "rollback", "ALB target health or 5xx alarm fired during the deploy window."
     if any(severity == "critical" for severity in severities):
         return "rollback", "Critical deployment-related alerts are firing."
     return "observe", "No automatic runbook has strong enough evidence."
@@ -43,10 +51,11 @@ def analyze(payload: dict) -> dict:
     deployment = payload.get("deployment") or payload
     alerts = payload.get("prometheus", {}).get("alerts") or payload.get("alerts", [])
     signals = payload.get("athena", {}).get("signals") or payload.get("signals", [])
-    runbooks = load_runbooks(alerts)
+    evidence_items = alerts + signals
+    runbooks = load_runbooks(evidence_items)
 
     candidates = []
-    for index, alert in enumerate(alerts[:3], start=1):
+    for index, alert in enumerate(evidence_items[:3], start=1):
         name = _alert_name(alert)
         evidence = [_summary(alert)] if _summary(alert) else [name]
         for signal in signals[:2]:

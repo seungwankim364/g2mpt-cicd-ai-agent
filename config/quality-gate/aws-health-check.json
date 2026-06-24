@@ -1,0 +1,31 @@
+{
+  "description": "CloudWatch alarms evaluated during the CD Quality Gate health check window. The check scans every alarm matching these prefixes in each region.",
+  "alarmStatesThatFail": ["ALARM"],
+  "insufficientDataIsFailure": false,
+  "missingRegionAlarmIsFailure": false,
+  "regions": [
+    {
+      "name": "ap-northeast-2",
+      "alarmNamePrefixes": ["gympt-prod-"],
+      "expectedCategories": [
+        "eks",
+        "rds",
+        "lambda",
+        "sqs",
+        "dynamodb",
+        "redis",
+        "alb",
+        "s3",
+        "waf",
+        "kvs",
+        "eventbridge",
+        "athena"
+      ]
+    },
+    {
+      "name": "us-east-1",
+      "alarmNamePrefixes": ["gympt-prod-cloudfront"],
+      "expectedCategories": ["cloudfront"]
+    }
+  ]
+}

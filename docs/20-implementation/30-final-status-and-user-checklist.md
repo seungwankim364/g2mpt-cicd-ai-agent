@@ -63,6 +63,8 @@ docs/20-implementation/29-dashboard-control-center-checklist.md
 [x] Kubernetes rollout 확인 script
 [x] Prometheus alert 조회 script
 [x] Prometheus metric 조회 script
+[x] CloudWatch alarm 전수 조회 script
+[x] CloudWatch metric evidence 생성 script
 [x] 5분 Health Check Window script
 [x] Quality Gate pass/fail 판단 script
 [x] Grafana dashboard link 생성 script
@@ -91,6 +93,37 @@ RedisHighMemory
 RedisHighEvictionRate
 BedrockHighErrorRate
 BedrockThrottling
+```
+
+CloudWatch 판단 범위:
+
+```text
+[x] RDS alarm
+[x] Lambda alarm
+[x] ALB alarm
+[x] S3 alarm
+[x] CloudFront alarm
+[x] KVS alarm
+[x] SQS alarm
+[x] DynamoDB alarm
+[x] Redis/ElastiCache alarm
+[x] EventBridge alarm
+[x] Athena alarm
+[x] WAF alarm
+```
+
+핵심 파일:
+
+```text
+config/quality-gate/aws-health-check.json
+scripts/quality-gate/query-cloudwatch-alarms.py
+scripts/runbooks/rds-*.sh
+scripts/runbooks/lambda-*.sh
+scripts/runbooks/alb-*.sh
+scripts/runbooks/s3-*.sh
+scripts/runbooks/cloudfront-*.sh
+scripts/runbooks/kvs-*.sh
+scripts/runbooks/dynamodb-*.sh
 ```
 
 ### 2.3 AI Incident Analysis
@@ -246,6 +279,9 @@ Prometheus 기본 URL은 Kubernetes 내부 service 주소이므로 Lambda에서 
 [x] Terraform validate 통과
 [x] Quality Gate pass fixture 통과
 [x] Quality Gate fail fixture 통과
+[x] CloudWatch normal fixture 통과
+[x] CloudWatch firing fixture 실패 처리 확인
+[x] CloudWatch alarm 미생성 상태는 warning/evidence로 처리
 [x] Slack payload dry-run 통과
 [x] EventBridge payload dry-run 통과
 [x] AI Agent/Lambda local 실행 통과

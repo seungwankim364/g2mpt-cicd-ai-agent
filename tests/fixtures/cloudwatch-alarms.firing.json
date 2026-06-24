@@ -1,0 +1,79 @@
+{
+  "status": "failed",
+  "summary": {
+    "totalAlarmCount": 4,
+    "failingAlarmCount": 2,
+    "insufficientDataAlarmCount": 0,
+    "missingRegionCount": 0
+  },
+  "regions": [
+    {
+      "region": "ap-northeast-2",
+      "status": "failed",
+      "alarmCount": 3,
+      "failingAlarmCount": 2,
+      "insufficientDataAlarmCount": 0,
+      "alarms": [
+        {
+          "alarmName": "gympt-prod-rds-connections-high",
+          "state": "ALARM",
+          "category": "rds",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnections",
+          "reason": "Threshold Crossed"
+        },
+        {
+          "alarmName": "gympt-prod-alb-target-5xx",
+          "state": "ALARM",
+          "category": "alb",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "HTTPCode_Target_5XX_Count",
+          "reason": "Threshold Crossed"
+        },
+        {
+          "alarmName": "gympt-prod-agent-action-errors",
+          "state": "OK",
+          "category": "lambda",
+          "namespace": "AWS/Lambda",
+          "metricName": "Errors"
+        }
+      ]
+    },
+    {
+      "region": "us-east-1",
+      "status": "passed",
+      "alarmCount": 1,
+      "failingAlarmCount": 0,
+      "insufficientDataAlarmCount": 0,
+      "alarms": [
+        {
+          "alarmName": "gympt-prod-cloudfront-5xx-error-rate",
+          "state": "OK",
+          "category": "cloudfront",
+          "namespace": "AWS/CloudFront",
+          "metricName": "5xxErrorRate"
+        }
+      ]
+    }
+  ],
+  "failingAlarms": [
+    {
+      "alarmName": "gympt-prod-rds-connections-high",
+      "state": "ALARM",
+      "category": "rds",
+      "namespace": "AWS/RDS",
+      "metricName": "DatabaseConnections",
+      "reason": "Threshold Crossed"
+    },
+    {
+      "alarmName": "gympt-prod-alb-target-5xx",
+      "state": "ALARM",
+      "category": "alb",
+      "namespace": "AWS/ApplicationELB",
+      "metricName": "HTTPCode_Target_5XX_Count",
+      "reason": "Threshold Crossed"
+    }
+  ],
+  "insufficientDataAlarms": [],
+  "missingRegions": []
+}

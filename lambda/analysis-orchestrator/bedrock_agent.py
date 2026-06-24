@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import sys
+from pathlib import Path
 
 try:
     import boto3
@@ -10,6 +12,9 @@ except ImportError:
 try:
     from ai_agent.slack_message_builder import build_second_alert
 except ImportError:
+    repo_ai_agent = Path(__file__).resolve().parents[2] / "ai-agent" / "app"
+    if repo_ai_agent.exists():
+        sys.path.insert(0, str(repo_ai_agent))
     from slack_message_builder import build_second_alert
 
 
@@ -39,6 +44,9 @@ def _compact_summary(summary: dict) -> dict:
         "failedAt": summary.get("failedAt"),
         "analysisWindow": summary.get("analysisWindow"),
         "alerts": summary.get("alerts", [])[:10],
+        "cloudwatchAlarms": summary.get("cloudwatchAlarms", [])[:10],
+        "awsHealth": summary.get("awsHealth", {}),
+        "awsMetricEvidence": summary.get("awsMetricEvidence", {}),
         "signals": summary.get("signals", [])[:10],
         "queryResults": summary.get("queryResults", [])[:10],
         "grafanaLinks": summary.get("grafanaLinks", {}),

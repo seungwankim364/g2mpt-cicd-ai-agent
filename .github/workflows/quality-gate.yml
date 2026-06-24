@@ -69,6 +69,9 @@ jobs:
       GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       HEALTH_CHECK_WINDOW_SECONDS: 300
       HEALTH_CHECK_INTERVAL_SECONDS: 60
+      CLOUDWATCH_ENABLED: "true"
+      CLOUDWATCH_REQUIRED: "true"
+      AWS_HEALTH_CONFIG_FILE: config/quality-gate/aws-health-check.json
 
     steps:
       - name: Checkout CD Quality Gate repository
@@ -165,6 +168,10 @@ jobs:
             prometheus-alerts-*.json
             prometheus-metrics.json
             prometheus-metrics-*.json
+            cloudwatch-alarms.json
+            cloudwatch-alarms-*.json
+            cloudwatch-metrics.json
+            cloudwatch-metrics-*.json
             quality-gate-result.json
             quality-gate-result-*.json
             quality-gate-window-result.json

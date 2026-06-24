@@ -22,7 +22,7 @@ AWS Lambda는 가능하면 AWS Secrets Manager에서 secret을 읽는다.
 | --- | --- | --- | --- |
 | `PROMETHEUS_URL` | yes | `.github/workflows/quality-gate.yml`, `scripts/quality-gate/query-prometheus-alerts.sh`, `scripts/quality-gate/query-prometheus-metrics.sh` | Prometheus API 조회 |
 | `SLACK_WEBHOOK_URL` | yes | `.github/workflows/quality-gate.yml`, `scripts/quality-gate/send-slack-first-alert.py`, `scripts/quality-gate/send-slack-deploy-success.py` | Slack `#cd-deploy-alarm` 알림 전송 |
-| `AWS_ROLE_ARN` | yes | `.github/workflows/quality-gate.yml` | GitHub OIDC로 AWS role assume 후 EventBridge event 발행 |
+| `AWS_ROLE_ARN` | yes | `.github/workflows/quality-gate.yml` | GitHub OIDC로 AWS role assume 후 CloudWatch alarm 조회와 EventBridge event 발행 |
 
 `GITOPS_PAT`는 기존 `gympt-ops` app CI/CD가 GitOps values update를 수행할 때 사용하는 secret이다. 이 저장소는 기존 배포 앞단을 다시 수행하지 않으므로 `GITOPS_PAT`를 필수 secret으로 받지 않는다.
 
@@ -108,6 +108,43 @@ MVP에서는 코드에 고정된 값을 유지해도 된다. 여러 환경으로
 | `cd-quality-gate/slack/webhook-url` | AWS Secrets Manager | no | Lambda가 Slack 2차 알림 전송 |
 | `cd-quality-gate/slack/signing-secret` | AWS Secrets Manager | no | Slack 승인 버튼 요청 signature 검증 |
 | Bedrock model access | AWS Bedrock console/IAM | no | Lambda가 Bedrock Runtime `InvokeModel` 성공 |
+
+## 5.1 `AWS_ROLE_ARN` 권한 정책
+
+Quality Gate workflow가 assume하는 AWS role에는 최소한 아래 권한이 필요하다.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "events:PutEvents"
+      ],
+      "Resource": "arn:aws:events:ap-northeast-2:337112169365:event-bus/cd-quality-gate-prod-bus"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:GetMetricStatistics"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+왜 CloudWatch 권한이 필요한가:
+
+```text
+Quality Gate는 Prometheus만 보는 것이 아니라,
+RDS, Lambda, ALB, S3, CloudFront, KVS 같은 AWS 리소스의 CloudWatch Alarm도 5분 동안 전수 조회한다.
+CloudWatch Alarm 조회 API는 resource-level ARN 제한이 어려워 일반적으로 Resource "*"를 사용한다.
+권한은 read-only인 DescribeAlarms/GetMetricStatistics만 부여한다.
+gympt-ops Terraform apply 전에는 일부 alarm이 아직 없을 수 있으므로, alarm 미존재는 실패가 아니라 warning/evidence로 남긴다.
+```
 
 ## 6. `GITOPS_PAT`
 

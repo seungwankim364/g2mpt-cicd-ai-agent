@@ -15,6 +15,7 @@ def build_message(result: dict, links: dict, github_run_url: str | None) -> dict
     service = result["service"]
     namespace = result["namespace"]
     alerts = result.get("matchedAlerts", [])
+    cloudwatch_alarms = result.get("cloudwatchAlarms", [])
     alert_lines = []
     for alert in alerts:
         alert_lines.append(
@@ -22,6 +23,20 @@ def build_message(result: dict, links: dict, github_run_url: str | None) -> dict
         )
     if not alert_lines:
         alert_lines.append("- No matching alert details found.")
+
+    cloudwatch_lines = []
+    for alarm in cloudwatch_alarms:
+        cloudwatch_lines.append(
+            "- {name} ({category}/{region}): {state} - {reason}".format(
+                name=alarm.get("alarmName", "unknown"),
+                category=alarm.get("category", "unknown"),
+                region=alarm.get("region", "unknown"),
+                state=alarm.get("state", "unknown"),
+                reason=alarm.get("reason") or alarm.get("metricName") or "No reason",
+            )
+        )
+    if not cloudwatch_lines:
+        cloudwatch_lines.append("- No CloudWatch alarms in ALARM state.")
 
     link_lines = []
     grafana = links.get("grafana", {})
@@ -46,6 +61,9 @@ def build_message(result: dict, links: dict, github_run_url: str | None) -> dict
             "",
             "Matched alerts:",
             *alert_lines,
+            "",
+            "CloudWatch alarms:",
+            *cloudwatch_lines,
             "",
             "Links:",
             *(link_lines or ["No links provided."]),

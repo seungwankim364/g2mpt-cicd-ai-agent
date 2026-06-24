@@ -43,7 +43,7 @@ Argo CD
 
 CD Quality Gate
   -> 배포 후 rollout 확인
-  -> Prometheus 기준 5분 health check
+  -> Prometheus + CloudWatch 기준 5분 health check
   -> Slack 알림
   -> 실패 시 EventBridge/Lambda/Bedrock 분석
   -> 승인 기반 rollback/fix/change 실행
@@ -1499,6 +1499,7 @@ scripts/quality-gate/run-health-check-window.sh
 ```text
 scripts/quality-gate/query-prometheus-alerts.sh
 scripts/quality-gate/query-prometheus-metrics.sh
+scripts/quality-gate/query-cloudwatch-alarms.py
 scripts/quality-gate/evaluate-quality-gate.py
 ```
 
@@ -1507,6 +1508,9 @@ scripts/quality-gate/evaluate-quality-gate.py
 ```text
 HEALTH_CHECK_WINDOW_SECONDS=300
 HEALTH_CHECK_INTERVAL_SECONDS=60
+CLOUDWATCH_ENABLED=true
+CLOUDWATCH_REQUIRED=true
+AWS_HEALTH_CONFIG_FILE=config/quality-gate/aws-health-check.json
 ```
 
 왜 5분을 보는가:
@@ -1541,6 +1545,50 @@ BedrockThrottling
 
 이 alert들은 `gympt-gitops/platform/monitoring`의 PrometheusRule과 dashboard 기준을 참고해서 확장했다.
 
+CloudWatch 평가 범위:
+
+```text
+ap-northeast-2:
+  gympt-prod- prefix의 CloudWatch Alarm 전수 조회
+  EKS / RDS / Lambda / SQS / DynamoDB / Redis / ALB / S3 / WAF / KVS / EventBridge / Athena
+
+us-east-1:
+  gympt-prod-cloudfront prefix의 CloudFront CloudWatch Alarm 전수 조회
+```
+
+CloudWatch를 추가한 이유:
+
+```text
+Prometheus는 Kubernetes 내부 pod/service 상태를 잘 본다.
+하지만 RDS, Lambda, ALB, S3, CloudFront, KVS 같은 AWS 관리형 리소스 장애는 CloudWatch Alarm이 더 직접적이다.
+그래서 Quality Gate는 Prometheus alert와 CloudWatch Alarm을 같은 5분 window 안에서 함께 판단한다.
+```
+
+CloudWatch 결과 파일:
+
+```text
+cloudwatch-alarms.json
+cloudwatch-alarms-*.json
+cloudwatch-metrics.json
+cloudwatch-metrics-*.json
+```
+
+판단 기준:
+
+```text
+CloudWatch Alarm StateValue가 ALARM이면 Quality Gate 실패
+INSUFFICIENT_DATA는 기본적으로 실패로 보지 않지만 payload에 남김
+설정된 region에서 alarm을 하나도 찾지 못하면 warning/evidence로 남김
+```
+
+주의:
+
+```text
+gympt-ops Terraform apply 전에는 CloudWatch alarm 리소스가 아직 AWS에 없을 수 있다.
+따라서 alarm 미존재 자체를 배포 실패로 보지는 않는다.
+다만 실제 운영 전환 후에는 gympt-ops CloudWatch alarm이 생성됐는지 별도 체크리스트로 확인한다.
+```
+
 ### Step 7.5 성공 시 Slack 완료 알림
 
 실행 파일:
@@ -1556,6 +1604,7 @@ GitHub Actions 성공
 Argo CD 반영
 Kubernetes rollout 성공
 Prometheus 5분 health check 성공
+CloudWatch 5분 health check 성공
 ```
 
 즉, 단순히 이미지가 올라간 것이 아니라 배포 후 안정성까지 통과했다는 뜻이다.
@@ -1575,6 +1624,7 @@ Slack 1차 알림에 포함되는 것:
 service
 namespace
 firing alerts
+CloudWatch ALARM 상태 리소스
 Grafana dashboard link
 Prometheus alert link
 Argo CD app link

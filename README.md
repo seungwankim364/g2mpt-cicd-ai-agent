@@ -4,7 +4,7 @@ Prometheus 기반 CD 배포 검증과 AI 장애 분석 파이프라인을 설계
 
 ## 한 줄 요약
 
-배포가 끝났는지만 확인하는 CD가 아니라, 배포 이후 서비스가 실제로 정상인지 Prometheus/Grafana 기준으로 검증하고, 실패 시 Slack, EventBridge, Athena, AI Agent를 연결해 원인 후보와 조치 방향을 전달하는 구조를 만든다.
+배포가 끝났는지만 확인하는 CD가 아니라, 배포 이후 서비스가 실제로 정상인지 Prometheus/Grafana와 AWS CloudWatch Alarm 기준으로 검증하고, 실패 시 Slack, EventBridge, Athena, AI Agent를 연결해 원인 후보와 조치 방향을 전달하는 구조를 만든다.
 
 ## 이 저장소의 역할
 
@@ -34,7 +34,7 @@ Existing gympt-ops CI/CD
   -> Argo CD automated sync
   -> EKS rollout 완료
   -> cd-quality-gate-architecture extension 시작
-  -> 5분 Health Check Window 동안 Prometheus alert/metric 조회
+  -> 5분 Health Check Window 동안 Prometheus alert/metric + CloudWatch alarm 조회
   -> Quality Gate 판단
   -> 정상: CD 성공
   -> 실패: CD 실패 + Slack 1차 알림
@@ -58,8 +58,9 @@ Existing gympt-ops CI/CD
 | CD 보조 스크립트 | [scripts/cd](scripts/cd) | rollout 확인, 선택적 GitOps/Argo CD 수동 운영 보조 도구 |
 | 서비스 설정 | [config/services/backend-api.yaml](config/services/backend-api.yaml) | backend-api 기준 서비스 설정 |
 | Quality Gate 설정 | [config/quality-gate](config/quality-gate) | threshold, alert mapping, Grafana dashboard 설정 |
-| Health Check Window | [scripts/quality-gate/run-health-check-window.sh](scripts/quality-gate/run-health-check-window.sh) | 기본 5분 동안 60초 간격으로 Prometheus alert/metric을 반복 조회하고 최종 Gate 결과 집계 |
+| Health Check Window | [scripts/quality-gate/run-health-check-window.sh](scripts/quality-gate/run-health-check-window.sh) | 기본 5분 동안 60초 간격으로 Prometheus alert/metric과 CloudWatch alarm을 반복 조회하고 최종 Gate 결과 집계 |
 | Prometheus 조회 | [scripts/quality-gate/query-prometheus-alerts.sh](scripts/quality-gate/query-prometheus-alerts.sh) | Prometheus alert 조회 또는 fixture 사용 |
+| CloudWatch 조회 | [scripts/quality-gate/query-cloudwatch-alarms.py](scripts/quality-gate/query-cloudwatch-alarms.py) | gympt-prod CloudWatch Alarm 전수 조회와 metric evidence 생성 |
 | Gate 판단 | [scripts/quality-gate/evaluate-quality-gate.py](scripts/quality-gate/evaluate-quality-gate.py) | firing alert 기반 pass/fail 판단 |
 | Grafana 링크 | [scripts/quality-gate/build-grafana-links.py](scripts/quality-gate/build-grafana-links.py) | Slack에 넣을 dashboard 링크 생성 |
 | Slack 1차 알림 | [scripts/quality-gate/send-slack-first-alert.py](scripts/quality-gate/send-slack-first-alert.py) | 실패 알림 payload 생성 또는 전송 |
@@ -99,7 +100,7 @@ Existing gympt-ops CI/CD
 | 알림 종류 | 배포 완료, CD 실패 1차 알림, AI 분석/rollback/fix/change 승인 알림 |
 | AI 분석 엔진 | 운영 기본값은 Amazon Bedrock, local fallback은 `ai-agent` rule analyzer |
 
-Quality Gate는 backend-api alert만 보지 않는다. `gympt-ops/gympt-gitops/platform/monitoring`의 PrometheusRule과 dashboard를 기준으로 backend, Kubernetes, SQS, GPU, Redis, Bedrock 관련 alert를 5분 window에서 함께 평가한다.
+Quality Gate는 backend-api alert만 보지 않는다. `gympt-ops/gympt-gitops/platform/monitoring`의 PrometheusRule과 dashboard를 기준으로 backend, Kubernetes, SQS, GPU, Redis, Bedrock 관련 alert를 5분 window에서 함께 평가한다. 또한 `gympt-ops/gympt-infra`의 CloudWatch Alarm 체계를 기준으로 RDS, Lambda, ALB, S3, CloudFront, KVS, DynamoDB, EventBridge, Athena, WAF alarm도 같은 window에서 전수 조회한다.
 
 평가 dashboard:
 

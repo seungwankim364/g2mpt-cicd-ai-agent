@@ -1,0 +1,67 @@
+{
+  "status": "passed",
+  "summary": {
+    "totalAlarmCount": 5,
+    "failingAlarmCount": 0,
+    "insufficientDataAlarmCount": 0,
+    "missingRegionCount": 0
+  },
+  "regions": [
+    {
+      "region": "ap-northeast-2",
+      "status": "passed",
+      "alarmCount": 4,
+      "failingAlarmCount": 0,
+      "insufficientDataAlarmCount": 0,
+      "alarms": [
+        {
+          "alarmName": "gympt-prod-rds-cpu-high",
+          "state": "OK",
+          "category": "rds",
+          "namespace": "AWS/RDS",
+          "metricName": "CPUUtilization"
+        },
+        {
+          "alarmName": "gympt-prod-agent-action-errors",
+          "state": "OK",
+          "category": "lambda",
+          "namespace": "AWS/Lambda",
+          "metricName": "Errors"
+        },
+        {
+          "alarmName": "gympt-prod-alb-target-5xx",
+          "state": "OK",
+          "category": "alb",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "HTTPCode_Target_5XX_Count"
+        },
+        {
+          "alarmName": "gympt-prod-live-session-kvs-put-media-errors",
+          "state": "OK",
+          "category": "kvs",
+          "namespace": "AWS/KinesisVideo",
+          "metricName": "PutMedia.Errors"
+        }
+      ]
+    },
+    {
+      "region": "us-east-1",
+      "status": "passed",
+      "alarmCount": 1,
+      "failingAlarmCount": 0,
+      "insufficientDataAlarmCount": 0,
+      "alarms": [
+        {
+          "alarmName": "gympt-prod-cloudfront-5xx-error-rate",
+          "state": "OK",
+          "category": "cloudfront",
+          "namespace": "AWS/CloudFront",
+          "metricName": "5xxErrorRate"
+        }
+      ]
+    }
+  ],
+  "failingAlarms": [],
+  "insufficientDataAlarms": [],
+  "missingRegions": []
+}
