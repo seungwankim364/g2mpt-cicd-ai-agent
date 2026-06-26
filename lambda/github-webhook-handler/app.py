@@ -158,15 +158,47 @@ def _dispatch_quality_gate(inputs):
 def handler(event, context):
     headers = _headers(event)
     raw_body = _body(event)
+    print(
+        json.dumps(
+            {
+                "message": "github webhook received",
+                "githubEvent": headers.get("x-github-event"),
+                "delivery": headers.get("x-github-delivery"),
+            },
+            sort_keys=True,
+        )
+    )
     if headers.get("x-github-event") != "workflow_run":
+        print(json.dumps({"message": "ignored webhook", "reason": "not workflow_run"}, sort_keys=True))
         return _json_response(202, {"status": "ignored", "reason": "not workflow_run"})
     if not _verify_signature(headers, raw_body):
+        print(json.dumps({"message": "rejected webhook", "reason": "invalid github signature"}, sort_keys=True))
         return _json_response(401, {"error": "invalid github signature"})
 
     payload = json.loads(raw_body.decode("utf-8"))
     allowed, checks = _should_dispatch(payload)
+    run = payload.get("workflow_run") or {}
+    repository = payload.get("repository") or {}
+    print(
+        json.dumps(
+            {
+                "message": "workflow_run evaluated",
+                "allowed": allowed,
+                "checks": checks,
+                "repository": repository.get("full_name"),
+                "workflow": run.get("name"),
+                "branch": run.get("head_branch"),
+                "event": run.get("event"),
+                "conclusion": run.get("conclusion"),
+                "runNumber": run.get("run_number"),
+                "runUrl": run.get("html_url"),
+            },
+            sort_keys=True,
+        )
+    )
     if not allowed:
         return _json_response(202, {"status": "ignored", "checks": checks})
 
     result = _dispatch_quality_gate(_quality_gate_inputs(payload))
+    print(json.dumps({"message": "quality gate dispatched", "result": result}, sort_keys=True))
     return _json_response(202, result)

@@ -94,6 +94,7 @@ jobs:
       CLOUDWATCH_ENABLED: "true"
       CLOUDWATCH_REQUIRED: "true"
       AWS_HEALTH_CONFIG_FILE: config/quality-gate/aws-health-check.json
+      EKS_CLUSTER_NAME: gympt-prod-eks
 
     steps:
       - name: Checkout CD Quality Gate repository
@@ -121,6 +122,16 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           unset-current-credentials: true
+
+      - name: Configure kubeconfig
+        run: |
+          KUBECONFIG_PATH="${RUNNER_TEMP}/kubeconfig"
+          aws eks update-kubeconfig \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION" \
+            --kubeconfig "$KUBECONFIG_PATH"
+          echo "KUBECONFIG=$KUBECONFIG_PATH" >> "$GITHUB_ENV"
+          kubectl config current-context
 
       - name: Check Kubernetes rollout
         env:
