@@ -77,7 +77,7 @@ jobs:
       ARGOCD_URL: ${{ inputs.argocd_url || 'https://argocd.g2mpt.com' }}
       ARGOCD_APP: backend-api-prod
       GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      HEALTH_CHECK_WINDOW_SECONDS: 300
+      HEALTH_CHECK_WINDOW_SECONDS: 120
       HEALTH_CHECK_INTERVAL_SECONDS: 60
       CLOUDWATCH_ENABLED: "true"
       CLOUDWATCH_REQUIRED: "true"
