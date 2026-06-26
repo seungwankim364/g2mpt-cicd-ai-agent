@@ -116,6 +116,9 @@ resource "aws_lambda_function" "github_webhook_handler" {
       K8S_NAMESPACE              = "gympt-prod"
       K8S_DEPLOYMENT             = "backend-api-prod"
       IMAGE_REPOSITORY           = "337112169365.dkr.ecr.${var.aws_region}.amazonaws.com/gympt-prod/backend-api"
+      PROMETHEUS_URL             = var.quality_gate_prometheus_url
+      GRAFANA_URL                = var.quality_gate_grafana_url
+      ARGOCD_URL                 = var.quality_gate_argocd_url
     }
   }
 

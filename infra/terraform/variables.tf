@@ -148,6 +148,24 @@ variable "quality_gate_workflow_ref" {
   default = "main"
 }
 
+variable "quality_gate_prometheus_url" {
+  type        = string
+  default     = "http://127.0.0.1:9090"
+  description = "Prometheus URL passed to the Quality Gate workflow for demo Slack links."
+}
+
+variable "quality_gate_grafana_url" {
+  type        = string
+  default     = "http://127.0.0.1:3000"
+  description = "Grafana URL passed to the Quality Gate workflow for demo Slack links."
+}
+
+variable "quality_gate_argocd_url" {
+  type        = string
+  default     = "https://127.0.0.1:8080"
+  description = "Argo CD URL passed to the Quality Gate workflow for demo Slack links."
+}
+
 variable "enable_dashboard" {
   type        = bool
   default     = false

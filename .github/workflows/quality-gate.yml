@@ -18,9 +18,21 @@ on:
       image_tag:
         required: true
         type: string
+      prometheus_url:
+        required: false
+        type: string
+        default: http://127.0.0.1:9090
+      grafana_url:
+        required: false
+        type: string
+        default: http://127.0.0.1:3000
+      argocd_url:
+        required: false
+        type: string
+        default: https://127.0.0.1:8080
     secrets:
       PROMETHEUS_URL:
-        required: true
+        required: false
       SLACK_WEBHOOK_URL:
         required: true
       AWS_ROLE_ARN:
@@ -67,14 +79,14 @@ jobs:
       IMAGE_TAG: ${{ inputs.image_tag }}
       ALERT_NAMES: BackendHighErrorRate,BackendHighLatency,BackendPodRestarting,BackendDBPoolExhaustion,BackendHighMemoryUsage,SQSQueueBacklog,SQSMessageAge,SQSDLQMessages,NodeHighCPUUsage,PodRestartFrequent,GPUHighUtilization,GPUMemoryHigh,RedisConnectionError,RedisHighMemory,RedisHighEvictionRate,BedrockHighErrorRate,BedrockThrottling
       MONITORED_NAMESPACES: gympt-prod,monitoring,posture-analysis,elasticache
-      PROMETHEUS_URL: ${{ inputs.prometheus_url || secrets.PROMETHEUS_URL }}
+      PROMETHEUS_URL: ${{ inputs.prometheus_url || secrets.PROMETHEUS_URL || 'http://127.0.0.1:9090' }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       EVENT_BUS_NAME: cd-quality-gate-prod-bus
       AWS_REGION: ap-northeast-2
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       SLACK_CHANNEL: "#cd-deploy-alarm"
-      GRAFANA_URL: ${{ inputs.grafana_url || 'https://grafana.g2mpt.com' }}
-      ARGOCD_URL: ${{ inputs.argocd_url || 'https://argocd.g2mpt.com' }}
+      GRAFANA_URL: ${{ inputs.grafana_url || 'http://127.0.0.1:3000' }}
+      ARGOCD_URL: ${{ inputs.argocd_url || 'https://127.0.0.1:8080' }}
       ARGOCD_APP: backend-api-prod
       GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       HEALTH_CHECK_WINDOW_SECONDS: 120

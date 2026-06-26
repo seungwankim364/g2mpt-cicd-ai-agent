@@ -28,6 +28,9 @@ IMAGE_REPOSITORY = os.environ.get(
     "IMAGE_REPOSITORY",
     "337112169365.dkr.ecr.ap-northeast-2.amazonaws.com/gympt-prod/backend-api",
 )
+PROMETHEUS_URL = os.environ.get("PROMETHEUS_URL", "http://127.0.0.1:9090")
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://127.0.0.1:3000")
+ARGOCD_URL = os.environ.get("ARGOCD_URL", "https://127.0.0.1:8080")
 _SECRET_CACHE = {}
 
 
@@ -104,6 +107,9 @@ def _quality_gate_inputs(payload):
         "namespace": K8S_NAMESPACE,
         "deployment": K8S_DEPLOYMENT,
         "image_tag": f"{IMAGE_REPOSITORY}:{image_tag}",
+        "prometheus_url": PROMETHEUS_URL,
+        "grafana_url": GRAFANA_URL,
+        "argocd_url": ARGOCD_URL,
     }
 
 
