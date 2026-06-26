@@ -8,6 +8,8 @@ YAML_PATH="${YAML_PATH:?YAML_PATH is required}"
 YAML_VALUE="${YAML_VALUE:?YAML_VALUE is required}"
 YAML_VALUE_TYPE="${YAML_VALUE_TYPE:-string}"
 COMMIT_MESSAGE="${COMMIT_MESSAGE:-ci: update ${VALUES_FILE} ${YAML_PATH}}"
+GITOPS_BASE_BRANCH="${GITOPS_BASE_BRANCH:-main}"
+GITOPS_UPDATE_MODE="${GITOPS_UPDATE_MODE:-pr}"
 
 if [[ -z "$GITOPS_REPO" || -z "$GITOPS_PAT" ]]; then
   echo "GITOPS_REPO or GITOPS_PAT is not set. Dry-run only."
@@ -113,9 +115,64 @@ if git diff --quiet; then
   exit 0
 fi
 
+if [[ "$GITOPS_UPDATE_MODE" != "direct" ]]; then
+  safe_path="$(printf '%s' "$YAML_PATH" | tr -c '[:alnum:]._-' '-')"
+  branch_name="cdqg/change-${safe_path}-$(date -u +%Y%m%d%H%M%S)"
+  git checkout -b "$branch_name"
+fi
+
 git add "$VALUES_FILE"
 git commit -m "$COMMIT_MESSAGE"
-git pull --rebase origin main
-git push origin main
+
+if [[ "$GITOPS_UPDATE_MODE" == "direct" ]]; then
+  git pull --rebase origin "$GITOPS_BASE_BRANCH"
+  git push origin "$GITOPS_BASE_BRANCH"
+  git rev-parse HEAD
+  exit 0
+fi
+
+git push origin "HEAD:${branch_name}"
+
+pr_title="$COMMIT_MESSAGE"
+pr_body="$(cat <<EOF
+Automated approved change request from cd-quality-gate.
+
+- values file: ${VALUES_FILE}
+- yaml path: ${YAML_PATH}
+- yaml value: ${YAML_VALUE}
+- value type: ${YAML_VALUE_TYPE}
+
+This repository uses protected main, so the approved change is proposed as a PR instead of pushing directly.
+EOF
+)"
+
+python3 - "$pr_title" "$branch_name" "$GITOPS_BASE_BRANCH" "$pr_body" > /tmp/gitops-pr-payload.json <<'PY'
+import json
+import sys
+
+title, head, base, body = sys.argv[1:]
+print(json.dumps({"title": title, "head": head, "base": base, "body": body}))
+PY
+
+status="$(curl -sS -o /tmp/gitops-pr.json -w "%{http_code}" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer ${GITOPS_PAT}" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/repos/${GITOPS_REPO}/pulls" \
+  -d @/tmp/gitops-pr-payload.json)"
+
+if [[ "$status" != "201" ]]; then
+  echo "Failed to create GitOps change PR. HTTP ${status}" >&2
+  cat /tmp/gitops-pr.json >&2
+  exit 1
+fi
+
+python3 - <<'PY'
+import json
+
+with open("/tmp/gitops-pr.json", encoding="utf-8") as f:
+    pr = json.load(f)
+print(f"Created GitOps PR: {pr['html_url']}")
+PY
 
 git rev-parse HEAD
