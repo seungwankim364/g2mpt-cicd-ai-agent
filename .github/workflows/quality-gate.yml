@@ -105,14 +105,11 @@ jobs:
 
       - name: Clear inherited AWS credentials
         run: |
+          unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE
           {
-            echo "AWS_PROFILE="
-            echo "AWS_DEFAULT_PROFILE="
             echo "AWS_ACCESS_KEY_ID="
             echo "AWS_SECRET_ACCESS_KEY="
             echo "AWS_SESSION_TOKEN="
-            echo "AWS_SHARED_CREDENTIALS_FILE="
-            echo "AWS_CONFIG_FILE="
           } >> "$GITHUB_ENV"
 
       - name: Configure AWS credentials
@@ -125,6 +122,7 @@ jobs:
 
       - name: Configure kubeconfig
         run: |
+          unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE
           KUBECONFIG_PATH="${RUNNER_TEMP}/kubeconfig"
           aws eks update-kubeconfig \
             --name "$EKS_CLUSTER_NAME" \
@@ -138,12 +136,16 @@ jobs:
           K8S_NAMESPACE: ${{ inputs.namespace }}
           K8S_DEPLOYMENT: ${{ inputs.deployment }}
           EXPECTED_IMAGE: ${{ inputs.image_tag }}
-        run: scripts/cd/check-k8s-rollout.sh
+        run: |
+          unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE
+          scripts/cd/check-k8s-rollout.sh
 
       - name: Run 5-minute health check window
         id: evaluate
         continue-on-error: true
-        run: scripts/quality-gate/run-health-check-window.sh
+        run: |
+          unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE
+          scripts/quality-gate/run-health-check-window.sh
 
       - name: Build Grafana links
         run: |
@@ -179,6 +181,7 @@ jobs:
           K8S_DEPLOYMENT: ${{ inputs.deployment }}
           CURRENT_IMAGE: ${{ inputs.image_tag }}
         run: |
+          unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE
           rollback_image="$(scripts/cd/find-previous-k8s-image.sh || true)"
           if [ -n "$rollback_image" ]; then
             echo "ROLLBACK_IMAGE_TAG=$rollback_image" >> "$GITHUB_ENV"
@@ -202,7 +205,9 @@ jobs:
         env:
           QUALITY_GATE_RESULT_FILE: quality-gate-result.json
           GRAFANA_LINKS_FILE: grafana-links.json
-        run: scripts/quality-gate/publish-eventbridge-event.sh
+        run: |
+          unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE
+          scripts/quality-gate/publish-eventbridge-event.sh
 
       - name: Upload artifacts
         if: always()
