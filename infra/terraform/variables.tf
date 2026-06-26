@@ -166,6 +166,18 @@ variable "quality_gate_argocd_url" {
   description = "Argo CD URL passed to the Quality Gate workflow for demo Slack links."
 }
 
+variable "github_actions_role_name" {
+  type        = string
+  default     = "cd-quality-gate-github-actions-role"
+  description = "Existing IAM role assumed by the Quality Gate GitHub Actions workflow through OIDC."
+}
+
+variable "eks_cluster_name" {
+  type        = string
+  default     = "gympt-prod-eks"
+  description = "EKS cluster name used by the Quality Gate workflow for rollout checks."
+}
+
 variable "enable_dashboard" {
   type        = bool
   default     = false

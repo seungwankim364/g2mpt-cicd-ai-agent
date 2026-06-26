@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 locals {
   name_prefix              = "${var.project}-${var.environment}"
   result_bucket_name       = coalesce(var.result_bucket_name, "${local.name_prefix}-results")

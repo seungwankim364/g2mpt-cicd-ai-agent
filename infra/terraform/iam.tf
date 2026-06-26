@@ -221,3 +221,21 @@ resource "aws_iam_role_policy" "github_webhook_handler" {
     ]
   })
 }
+
+resource "aws_iam_role_policy" "github_actions_eks_describe_cluster" {
+  name = "${local.name_prefix}-github-actions-eks-describe-cluster"
+  role = var.github_actions_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "eks:DescribeCluster"
+        ]
+        Resource = "arn:aws:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.eks_cluster_name}"
+      }
+    ]
+  })
+}
