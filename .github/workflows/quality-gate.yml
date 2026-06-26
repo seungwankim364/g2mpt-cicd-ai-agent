@@ -95,6 +95,9 @@ jobs:
       CLOUDWATCH_REQUIRED: "true"
       AWS_HEALTH_CONFIG_FILE: config/quality-gate/aws-health-check.json
       EKS_CLUSTER_NAME: gympt-prod-eks
+      PROMETHEUS_NAMESPACE: monitoring
+      PROMETHEUS_SERVICE: kube-prometheus-stack-prometheus
+      PROMETHEUS_LOCAL_PORT: 9090
 
     steps:
       - name: Checkout CD Quality Gate repository
@@ -135,6 +138,41 @@ jobs:
             --kubeconfig "$KUBECONFIG_PATH"
           echo "KUBECONFIG=$KUBECONFIG_PATH" >> "$GITHUB_ENV"
           kubectl config current-context
+
+      - name: Start Prometheus port-forward
+        run: |
+          unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE
+
+          if curl -fsS "http://127.0.0.1:${PROMETHEUS_LOCAL_PORT}/-/healthy" >/dev/null 2>&1; then
+            echo "Prometheus is already reachable on 127.0.0.1:${PROMETHEUS_LOCAL_PORT}"
+            echo "PROMETHEUS_URL=http://127.0.0.1:${PROMETHEUS_LOCAL_PORT}" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          log_file="${RUNNER_TEMP}/prometheus-port-forward.log"
+          kubectl -n "$PROMETHEUS_NAMESPACE" port-forward \
+            "svc/${PROMETHEUS_SERVICE}" \
+            "${PROMETHEUS_LOCAL_PORT}:9090" >"$log_file" 2>&1 &
+          pf_pid="$!"
+          echo "PROMETHEUS_PORT_FORWARD_PID=$pf_pid" >> "$GITHUB_ENV"
+          echo "PROMETHEUS_URL=http://127.0.0.1:${PROMETHEUS_LOCAL_PORT}" >> "$GITHUB_ENV"
+
+          for _ in $(seq 1 30); do
+            if curl -fsS "http://127.0.0.1:${PROMETHEUS_LOCAL_PORT}/-/healthy" >/dev/null 2>&1; then
+              echo "Prometheus port-forward is ready on 127.0.0.1:${PROMETHEUS_LOCAL_PORT}"
+              exit 0
+            fi
+            if ! kill -0 "$pf_pid" >/dev/null 2>&1; then
+              echo "Prometheus port-forward exited early"
+              cat "$log_file"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Timed out waiting for Prometheus port-forward"
+          cat "$log_file"
+          exit 1
 
       - name: Check Kubernetes rollout
         env:
@@ -236,6 +274,13 @@ jobs:
             slack-deploy-success.json
             deployment-failed-event.json
           if-no-files-found: ignore
+
+      - name: Stop Prometheus port-forward
+        if: always()
+        run: |
+          if [ -n "${PROMETHEUS_PORT_FORWARD_PID:-}" ] && kill -0 "$PROMETHEUS_PORT_FORWARD_PID" >/dev/null 2>&1; then
+            kill "$PROMETHEUS_PORT_FORWARD_PID"
+          fi
 
       - name: Fail job when Quality Gate failed
         if: steps.evaluate.outcome == 'failure'
