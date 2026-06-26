@@ -46,6 +46,7 @@ def start_athena_queries(detail):
     if not template_path.exists() or boto3 is None or not ATHENA_OUTPUT_LOCATION:
         return query_ids
 
+    window = build_analysis_window(detail["failedAt"])
     template = json.loads(template_path.read_text(encoding="utf-8"))
     athena = boto3.client("athena")
     for item in template.get("queries", []):
@@ -53,13 +54,22 @@ def start_athena_queries(detail):
         sql_path = Path("athena/queries") / query_file
         if not sql_path.exists():
             continue
-        response = athena.start_query_execution(
-            QueryString=sql_path.read_text(encoding="utf-8"),
-            QueryExecutionContext={"Database": ATHENA_DATABASE},
-            ResultConfiguration={"OutputLocation": ATHENA_OUTPUT_LOCATION},
-            WorkGroup=ATHENA_WORKGROUP,
+        query_id = query_file.replace(".sql", "")
+        sql = (
+            sql_path.read_text(encoding="utf-8")
+            .replace(":start_time", f"'{window['start']}'")
+            .replace(":end_time", f"'{window['end']}'")
         )
-        query_ids.append({"id": query_file.replace(".sql", ""), "queryExecutionId": response["QueryExecutionId"]})
+        try:
+            response = athena.start_query_execution(
+                QueryString=sql,
+                QueryExecutionContext={"Database": ATHENA_DATABASE},
+                ResultConfiguration={"OutputLocation": ATHENA_OUTPUT_LOCATION},
+                WorkGroup=ATHENA_WORKGROUP,
+            )
+            query_ids.append({"id": query_id, "queryExecutionId": response["QueryExecutionId"]})
+        except Exception as error:
+            query_ids.append({"id": query_id, "status": "FAILED_TO_START", "error": str(error)})
     return query_ids
 
 
@@ -69,6 +79,9 @@ def wait_or_collect_query_results(query_ids):
     athena = boto3.client("athena")
     results = []
     for item in query_ids:
+        if item.get("status") == "FAILED_TO_START":
+            results.append(item)
+            continue
         query_id = item["queryExecutionId"]
         state = "RUNNING"
         for _ in range(12):
